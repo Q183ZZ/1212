@@ -1,0 +1,16 @@
+[Unit]
+Description=Yaobao Linux Navigation Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/yaobao
+ExecStart=/opt/yaobao/.venv/bin/python3 /opt/yaobao/main.py
+Restart=always
+RestartSec=3
+User=root
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

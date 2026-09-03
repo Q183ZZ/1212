@@ -1,0 +1,53 @@
+{
+  "gps": {
+    "device": "/dev/ttyUSB0",
+    "baudrate": 9600,
+    "min_quality": 1,
+    "max_hdop": 8.0,
+    "max_accuracy_m": 100.0
+  },
+  "network": {
+    "api_base": "http://127.0.0.1:3000",
+    "timeout_s": 8,
+    "retries": 2,
+    "retry_backoff_s": [
+      0.5,
+      1.0,
+      2.0
+    ]
+  },
+  "cache": {
+    "db": "data/yaobao.sqlite3",
+    "max_routes": 20
+  },
+  "voice": {
+    "stt": {
+      "enabled": true,
+      "engine": "vosk",
+      "model": "models/vosk-zh"
+    },
+    "tts": {
+      "enabled": true,
+      "engine": "piper",
+      "binary": "piper",
+      "model": "models/piper/zh_CN-model.onnx"
+    }
+  },
+  "display": {
+    "enabled": true,
+    "fullscreen": true,
+    "width": 800,
+    "height": 480,
+    "fps": 10
+  },
+  "bluetooth": {
+    "enabled": true,
+    "device_name": "耀宝",
+    "profile": "a2dp-sink",
+    "discoverable_seconds": 120,
+    "audio": {
+      "duck_db": 15,
+      "restore_delay_ms": 300
+    }
+  }
+}

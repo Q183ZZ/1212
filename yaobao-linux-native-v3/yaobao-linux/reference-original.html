@@ -1,0 +1,2723 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>遥望</title>
+<style>
+  /* ============================================================
+     视觉主题 v2：白色 Apple 风格 + 毛玻璃（Glassmorphism）
+     配色通过 CSS 变量集中管理：:root 是浅色（默认），body.theme-dark
+     覆盖为深色。所有组件颜色只引用变量，不再写死色值，
+     这样夜间模式切换时地图之外的一切（文字/卡片/角标/Toast）
+     都会随变量自动换色，不需要额外的每个组件判断逻辑。
+     ============================================================ */
+  :root{
+    /* 基础色板 */
+    --bg-deep:#f5f5f7;
+    --glass-fill:rgba(255,255,255,0.72);
+    --glass-fill-strong:rgba(255,255,255,0.88);
+    --glass-border:rgba(0,0,0,0.06);
+    --accent:#007aff;
+    --accent-strong:#0066d6;
+    --accent-shadow:rgba(0,122,255,0.35);
+    --accent-halo:rgba(0,122,255,0.35);
+    --orb-glow:rgba(0,122,255,0.45);
+    --mint:#34c759;
+    --danger:#ff3b30;
+    --text-primary:#1d1d1f;
+    --text-secondary:#6e6e73;
+    --text-faint:#a1a1a6;
+    --on-accent:#ffffff;
+
+    /* 中性表面色：卡片内的输入框/按钮底色，浅色模式下是「压暗」，
+       深色模式下是「提亮」，语义统一叫 surface，具体色值由主题决定 */
+    --surface-1:rgba(0,0,0,0.045);
+    --surface-1-active:rgba(0,0,0,0.09);
+    --surface-2:rgba(0,0,0,0.06);
+    --surface-2-active:rgba(0,0,0,0.12);
+
+    /* 阴影：浅色模式下阴影要淡，不然会显脏 */
+    --shadow-soft:0 8px 30px rgba(0,0,0,0.10);
+    --shadow-toast:0 10px 30px rgba(0,0,0,0.14);
+    --shadow-sheet:0 -10px 40px rgba(0,0,0,0.12);
+    --shadow-drawer:-16px 0 40px rgba(0,0,0,0.14);
+    --shadow-frame:0 0 60px rgba(0,0,0,0.10);
+    --drawer-mask:rgba(0,0,0,0.35);
+
+    /* 语义强调色的「浅底/描边/文字」三件套，用于 toast、标签、按钮态 */
+    --danger-soft-border:rgba(255,59,48,0.32);
+    --danger-soft-bg:rgba(255,59,48,0.10);
+    --danger-soft-text:#c0281f;
+    --mint-soft-border:rgba(52,199,89,0.30);
+    --mint-soft-bg:rgba(52,199,89,0.10);
+    --mint-soft-text:#1f8a4c;
+  }
+
+  body.theme-dark{
+    --bg-deep:#000000;
+    --glass-fill:rgba(28,28,30,0.72);
+    --glass-fill-strong:rgba(28,28,30,0.88);
+    --glass-border:rgba(255,255,255,0.09);
+    --accent:#0a84ff;
+    --accent-strong:#409cff;
+    --accent-shadow:rgba(10,132,255,0.45);
+    --accent-halo:rgba(10,132,255,0.4);
+    --orb-glow:rgba(10,132,255,0.5);
+    --mint:#30d158;
+    --danger:#ff453a;
+    --text-primary:#f5f5f7;
+    --text-secondary:#98989d;
+    --text-faint:#636366;
+    --on-accent:#ffffff;
+
+    --surface-1:rgba(255,255,255,0.07);
+    --surface-1-active:rgba(255,255,255,0.14);
+    --surface-2:rgba(255,255,255,0.08);
+    --surface-2-active:rgba(255,255,255,0.16);
+
+    --shadow-soft:0 8px 30px rgba(0,0,0,0.45);
+    --shadow-toast:0 10px 30px rgba(0,0,0,0.5);
+    --shadow-sheet:0 -10px 40px rgba(0,0,0,0.5);
+    --shadow-drawer:-16px 0 40px rgba(0,0,0,0.5);
+    --shadow-frame:0 0 60px rgba(0,0,0,0.6);
+    --drawer-mask:rgba(0,0,0,0.6);
+
+    --danger-soft-border:rgba(255,69,58,0.4);
+    --danger-soft-bg:rgba(255,69,58,0.14);
+    --danger-soft-text:#ffb4ae;
+    --mint-soft-border:rgba(48,209,88,0.32);
+    --mint-soft-bg:rgba(48,209,88,0.12);
+    --mint-soft-text:#a8f0bd;
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue","Segoe UI",Roboto,sans-serif;
+    background:var(--bg-deep);
+    color:var(--text-primary);
+    transition:background 0.25s ease,color 0.25s ease;
+  }
+
+  /* ============================================================
+     电脑端最大宽度 480px 居中：整个 App（地图+所有浮层）都装在
+     这个容器里，容器本身 position:relative 作为浮层的定位基准，
+     这样浮层就不会在宽屏下跑到视口边缘，而是跟着 480px 走。
+     手机端视口本来就窄于 480px，容器等于铺满屏幕，观感不变。
+     ============================================================ */
+  .app-frame{
+    position:relative;
+    width:100%;
+    max-width:480px;
+    height:100%;
+    margin:0 auto;
+    overflow:hidden;
+    background:var(--bg-deep);
+    box-shadow:var(--shadow-frame);
+  }
+
+  #map{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    background:var(--bg-deep);
+  }
+
+  .glass{
+    background:var(--glass-fill);
+    -webkit-backdrop-filter:blur(20px) saturate(160%);
+    backdrop-filter:blur(20px) saturate(160%);
+    border:1px solid var(--glass-border);
+  }
+
+  /* ===== 顶部状态条 ===== */
+  .top-bar{
+    position:absolute;
+    top:calc(14px + env(safe-area-inset-top,0px));
+    left:14px;
+    right:14px;
+    z-index:40;
+    border-radius:22px;
+    padding:10px 12px 10px 14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    box-shadow:var(--shadow-soft);
+  }
+  .brand{display:flex;align-items:center;gap:10px;min-width:0;}
+  .top-bar-actions{display:flex;align-items:center;gap:8px;flex:none;}
+  .ai-orb{
+    width:13px;height:13px;border-radius:50%;flex:none;
+    background:radial-gradient(circle at 30% 30%,var(--accent),var(--accent-strong));
+    box-shadow:0 0 0 0 var(--orb-glow);
+    animation:orbPulse 2.6s ease-in-out infinite;
+  }
+  .ai-orb.thinking{
+    background:radial-gradient(circle at 30% 30%,var(--mint),#159b7c);
+    animation:orbThinking 0.85s ease-in-out infinite;
+  }
+  .ai-orb.speaking{
+    background:radial-gradient(circle at 30% 30%,var(--accent),var(--accent-strong));
+    animation:orbSpeaking 0.45s ease-in-out infinite alternate;
+  }
+  @keyframes orbPulse{
+    0%,100%{box-shadow:0 0 0 0 var(--orb-glow);transform:scale(1);}
+    50%{box-shadow:0 0 0 9px rgba(0,0,0,0);transform:scale(1.06);}
+  }
+  @keyframes orbThinking{0%,100%{transform:scale(1);}50%{transform:scale(1.3);}}
+  @keyframes orbSpeaking{from{transform:scale(0.85);}to{transform:scale(1.35);}}
+
+  .brand-text{display:flex;flex-direction:column;line-height:1.25;min-width:0;}
+  .brand-text strong{font-size:15px;font-weight:700;letter-spacing:0.3px;}
+  .brand-text small{
+    font-size:11.5px;color:var(--text-secondary);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38vw;
+  }
+  .icon-btn{
+    flex:none;width:38px;height:38px;border-radius:50%;
+    background:var(--surface-2);
+    border:1px solid var(--glass-border);
+    color:var(--text-primary);
+    font-size:16px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    transition:transform 0.15s ease,background 0.15s ease;
+  }
+  .icon-btn:active{transform:scale(0.9);background:var(--surface-2-active);}
+  .bluetooth-status-btn{position:relative;color:var(--text-faint);}
+  .bluetooth-status-btn.connected{color:var(--accent);}
+  .bluetooth-status-btn.connected .icon-bluetooth{filter:drop-shadow(0 0 5px var(--accent-halo));}
+  .icon-bluetooth{width:18px;height:18px;display:block;}
+  .icon-bluetooth svg{width:18px;height:18px;display:block;}
+  .bluetooth-status-btn:not(.connected){opacity:.52;}
+  .voice-input-wrap{position:relative;display:flex;align-items:center;justify-content:center;flex:none;width:36px;height:36px;}
+  .voice-input-wrap .voice-btn{width:36px;height:36px;}
+  .aec-status-dot{position:absolute;right:-1px;top:-1px;width:7px;height:7px;border-radius:50%;background:var(--text-faint);border:1.5px solid var(--surface-1);box-sizing:border-box;transition:background .2s ease,box-shadow .2s ease,transform .2s ease;}
+  .aec-status-dot.active{background:#ff9f0a;box-shadow:0 0 7px rgba(255,159,10,.75);transform:scale(1.08);}
+
+  /* ===== Toast ===== */
+  #toast{
+    position:absolute;
+    top:calc(70px + env(safe-area-inset-top,0px));
+    left:50%;
+    transform:translateX(-50%) translateY(-14px);
+    z-index:60;
+    max-width:86%;
+    padding:11px 20px;
+    border-radius:999px;
+    font-size:13.5px;
+    font-weight:500;
+    text-align:center;
+    background:var(--glass-fill-strong);
+    -webkit-backdrop-filter:blur(18px);
+    backdrop-filter:blur(18px);
+    border:1px solid var(--glass-border);
+    box-shadow:var(--shadow-toast);
+    color:var(--text-primary);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 0.25s ease,transform 0.25s ease,background 0.25s ease,color 0.25s ease;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #toast.toast-error{border-color:var(--danger-soft-border);color:var(--danger-soft-text);}
+  #toast.toast-success{border-color:var(--mint-soft-border);color:var(--mint-soft-text);}
+
+  /* ===== 底部悬浮卡片 ===== */
+  .bottom-sheet{
+    position:absolute;
+    left:12px;right:12px;
+    bottom:calc(12px + env(safe-area-inset-bottom,0px));
+    z-index:40;
+    border-radius:28px;
+    padding:8px 16px calc(14px);
+    box-shadow:var(--shadow-sheet);
+    max-height:78vh;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    transition:background 0.25s ease,border-color 0.25s ease;
+  }
+
+  /* 需求「底部卡片默认收起」：拖拽把手，点一下展开/收起 sheet-body。
+     收起态只留把手 + AI 输入框，展开态才露出起终点/标签/结果/按钮。 */
+  .sheet-handle{
+    width:100%;
+    display:flex;
+    justify-content:center;
+    padding:6px 0 2px;
+    cursor:pointer;
+  }
+  .sheet-handle span{
+    width:36px;height:4px;border-radius:999px;
+    background:var(--surface-2-active);
+  }
+  .sheet-body{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    max-height:0;
+    opacity:0;
+    overflow:hidden;
+    pointer-events:none;
+    transition:max-height 0.32s cubic-bezier(.2,.8,.2,1),opacity 0.22s ease;
+  }
+  .bottom-sheet.expanded .sheet-body{
+    max-height:62vh;
+    opacity:1;
+    pointer-events:auto;
+    overflow-y:auto;
+  }
+  .sheet-body::-webkit-scrollbar{display:none;}
+
+  .ai-input-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:var(--surface-1);
+    border:1px solid var(--glass-border);
+    border-radius:999px;
+    padding:6px 6px 6px 16px;
+  }
+  .ai-input-row input{
+    flex:1;
+    background:transparent;
+    border:none;
+    outline:none;
+    color:var(--text-primary);
+    font-size:14.5px;
+    min-width:0;
+  }
+  .ai-input-row input::placeholder{color:var(--text-faint);}
+  .orb-btn{
+    flex:none;width:36px;height:36px;border-radius:50%;
+    border:none;cursor:pointer;
+    background:linear-gradient(135deg,var(--accent),var(--accent-strong));
+    color:var(--on-accent);font-size:15px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+    transition:transform 0.12s ease;
+  }
+  .orb-btn:active{transform:scale(0.88);}
+  .voice-btn{
+    flex:none;width:36px;height:36px;border-radius:50%;border:1px solid var(--glass-border);
+    background:var(--surface-2);color:var(--text-secondary);display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:transform .12s ease,background .2s ease,color .2s ease,border-color .2s ease;
+    position:relative;
+  }
+  .voice-btn:active{transform:scale(.88);}
+  .voice-btn.recording{background:#ff453a;color:#fff;border-color:#ff453a;animation:voicePulse 1s infinite;}
+  .voice-btn svg{width:17px;height:17px;display:block;}
+  @keyframes voicePulse{0%,100%{box-shadow:0 0 0 0 rgba(255,69,58,.35)}50%{box-shadow:0 0 0 9px rgba(255,69,58,0)}}
+  .route-options{display:flex;flex-direction:column;gap:9px;margin-top:12px;}
+  .route-option-card{position:relative;width:100%;text-align:left;border:1px solid var(--glass-border);background:var(--surface-2);border-radius:16px;padding:11px 12px;color:var(--text-primary);cursor:pointer;transition:.18s ease;}
+  .route-option-card.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 24px rgba(0,0,0,.08);}
+  .route-option-top{display:flex;align-items:center;gap:8px;}
+  .route-option-name{font-size:14px;font-weight:750;flex:1;}
+  .route-option-recommend{font-size:10px;padding:3px 7px;border-radius:999px;background:var(--accent);color:var(--on-accent);}
+  .route-option-metrics{display:flex;align-items:baseline;gap:9px;margin-top:7px;}
+  .route-option-time{font-size:20px;font-weight:800;color:var(--accent);}
+  .route-option-distance{font-size:12.5px;color:var(--text-secondary);}
+  .route-option-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;}
+  .route-option-tag{font-size:10.5px;color:var(--text-secondary);padding:3px 6px;border-radius:7px;background:var(--surface-1);}
+  .route-option-path{margin-top:7px;font-size:11px;color:var(--text-faint);line-height:1.45;}
+
+  /* 路线结果卡片：成功态与错误态共用容器。
+     成功态额外留出角标位：方案名（左上）、偏好标签（右上）、
+     高德水印（右下），失败态不加角标位，保持原来紧凑的错误提示。 */
+  .route-result{
+    position:relative;
+    background:var(--surface-1);
+    border:1px solid var(--glass-border);
+    border-radius:18px;
+    padding:12px 14px;
+  }
+  .route-result.success-badges{padding:34px 14px 26px;}
+  .route-result .rr-top{
+    display:flex;align-items:baseline;gap:10px;margin-bottom:6px;flex-wrap:wrap;
+  }
+  .route-result .rr-time{font-size:22px;font-weight:800;letter-spacing:0.4px;color:var(--accent);}
+  .route-result .rr-dist{font-size:13.5px;color:var(--text-secondary);}
+  .route-result .rr-path{font-size:12.5px;color:var(--text-faint);line-height:1.5;}
+  .route-result.error{border-color:var(--danger-soft-border);}
+  .route-result .rr-error{
+    font-size:13.5px;color:var(--danger);font-weight:600;line-height:1.5;
+    display:flex;align-items:center;gap:6px;
+  }
+  /* 角标规范 */
+  .rr-badge-plan{
+    position:absolute;top:10px;left:12px;
+    font-size:11px;font-weight:700;
+    padding:3px 10px;border-radius:999px;
+    background:var(--accent);color:var(--on-accent);
+    letter-spacing:0.2px;
+  }
+  .rr-badge-tags{
+    position:absolute;top:12px;right:12px;
+    max-width:56%;
+    font-size:10.5px;color:var(--text-secondary);
+    text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .rr-watermark{
+    position:absolute;bottom:8px;right:12px;
+    font-size:9.5px;color:var(--text-faint);letter-spacing:0.3px;
+  }
+
+  .point-row{display:flex;align-items:center;gap:8px;}
+  .point-inputs{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;}
+  .point-field{
+    display:flex;align-items:center;gap:8px;
+    background:var(--surface-1);
+    border:1px solid var(--glass-border);
+    border-radius:16px;
+    padding:10px 10px 10px 14px;
+  }
+  .dot{width:8px;height:8px;border-radius:50%;flex:none;}
+  .dot-start{background:var(--accent);box-shadow:0 0 6px var(--accent-halo);}
+  .dot-end{background:var(--danger);box-shadow:0 0 6px var(--danger-soft-border);}
+  .point-field input{
+    flex:1;background:transparent;border:none;outline:none;
+    color:var(--text-primary);font-size:14.5px;min-width:0;
+  }
+  .point-field input::placeholder{color:var(--text-faint);}
+  .mini-btn{
+    flex:none;width:30px;height:30px;border-radius:50%;
+    border:none;cursor:pointer;
+    background:var(--surface-2);
+    color:var(--text-primary);font-size:14px;
+    display:flex;align-items:center;justify-content:center;
+    transition:transform 0.12s ease,background 0.12s ease;
+  }
+  .mini-btn:active{transform:scale(0.88);background:var(--surface-2-active);}
+  .swap-btn{width:38px;height:38px;font-size:16px;flex:none;}
+
+  .tag-scroll{
+    display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;
+    scrollbar-width:none;
+  }
+  .tag-scroll::-webkit-scrollbar{display:none;}
+  .tag-btn{
+    flex:none;
+    background:var(--surface-1);
+    border:1px solid var(--glass-border);
+    color:var(--text-secondary);
+    padding:7px 16px;
+    border-radius:999px;
+    font-size:12.5px;
+    font-weight:500;
+    cursor:pointer;
+    transition:transform 0.12s ease,background 0.15s ease,color 0.15s ease;
+    white-space:nowrap;
+  }
+  .tag-btn:active{transform:scale(0.94);}
+  .tag-btn.active{
+    background:linear-gradient(135deg,var(--accent),var(--accent-strong));
+    color:var(--on-accent);
+    border-color:transparent;
+    font-weight:700;
+  }
+
+  .action-row{display:flex;gap:10px;}
+  .btn-nav{
+    flex:1;
+    border:1px solid var(--mint-soft-border);
+    background:var(--mint-soft-bg);
+    color:var(--mint-soft-text);
+    border-radius:18px;
+    font-size:14px;
+    font-weight:700;
+    padding:14px 10px;
+    cursor:pointer;
+  }
+  .btn-nav.active{
+    background:var(--danger-soft-bg);
+    border-color:var(--danger-soft-border);
+    color:var(--danger-soft-text);
+  }
+  .btn-primary,.btn-ghost{
+    border:none;cursor:pointer;
+    border-radius:18px;
+    font-size:14.5px;
+    font-weight:700;
+    padding:14px 0;
+    transition:transform 0.12s ease,filter 0.12s ease;
+  }
+  .btn-primary{
+    flex:2;
+    background:linear-gradient(135deg,var(--accent),var(--accent-strong));
+    color:var(--on-accent);
+    box-shadow:0 8px 22px var(--accent-shadow);
+  }
+  .btn-primary:active{transform:scale(0.97);filter:brightness(0.95);}
+  .btn-ghost{
+    flex:1;
+    background:var(--surface-1);
+    border:1px solid var(--glass-border);
+    color:var(--text-primary);
+  }
+  .btn-ghost:active{transform:scale(0.97);background:var(--surface-1-active);}
+
+  /* ===== 历史抽屉 ===== */
+  .drawer-mask{
+    position:absolute;inset:0;background:var(--drawer-mask);
+    z-index:50;opacity:0;pointer-events:none;transition:opacity 0.25s ease;
+  }
+  .drawer-mask.show{opacity:1;pointer-events:auto;}
+  .history-drawer{
+    position:absolute;top:0;right:0;bottom:0;
+    width:min(82%,340px);
+    z-index:55;
+    padding:calc(18px + env(safe-area-inset-top,0px)) 18px 18px;
+    display:flex;flex-direction:column;gap:10px;
+    transform:translateX(100%);
+    transition:transform 0.3s cubic-bezier(.2,.8,.2,1);
+    box-shadow:var(--shadow-drawer);
+  }
+  .history-drawer.open{transform:translateX(0);}
+  .drawer-header{display:flex;align-items:center;justify-content:space-between;}
+  .drawer-header h3{font-size:16px;font-weight:700;}
+  .drawer-header button{
+    background:var(--surface-2);border:none;color:var(--text-primary);
+    width:30px;height:30px;border-radius:50%;font-size:14px;cursor:pointer;
+  }
+  .history-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;}
+  .history-item{
+    background:var(--surface-1);
+    border:1px solid var(--glass-border);
+    border-radius:16px;
+    padding:12px 14px;
+    display:flex;flex-direction:column;gap:4px;
+  }
+  .history-item .hi-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+  .history-item .hi-route{font-size:13.5px;font-weight:600;}
+  .history-item .hi-meta{font-size:12px;color:var(--text-secondary);}
+  .history-item .hi-tags{font-size:11.5px;color:var(--accent);}
+  .hi-delete{
+    flex:none;width:24px;height:24px;border-radius:50%;
+    background:var(--surface-2);border:none;color:var(--text-secondary);
+    font-size:12px;cursor:pointer;line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    transition:transform 0.12s ease,background 0.12s ease,color 0.12s ease;
+  }
+  .hi-delete:active{transform:scale(0.85);background:var(--danger-soft-bg);color:var(--danger-soft-text);}
+  .history-empty{color:var(--text-faint);font-size:13.5px;padding:20px 4px;text-align:center;}
+
+  /* GPS 定位点：采用 iOS 地图「蓝点」惯例，跟随 --accent 变量，
+     不需要为深浅色单独写一套 */
+  .live-dot{
+    width:20px;height:20px;border-radius:50%;
+    background:radial-gradient(circle at 32% 30%,#ffffff 0 18%,var(--accent) 19% 62%,var(--accent-strong) 63%);
+    border:2px solid rgba(255,255,255,0.96);
+    box-shadow:0 0 0 7px var(--accent-halo),0 3px 12px rgba(0,0,0,0.35);
+  }
+
+  .user-dot{
+    width:16px;height:16px;border-radius:50%;
+    background:radial-gradient(circle at 30% 30%,var(--accent),var(--accent-strong));
+    border:2px solid rgba(255,255,255,0.9);
+    box-shadow:0 0 0 6px var(--accent-halo),0 2px 8px rgba(0,0,0,0.3);
+  }
+
+
+  /* ===== 第一批：搜索引擎 ===== */
+  .poi-search{display:flex;flex-direction:column;gap:9px;}
+  .poi-search-row{display:flex;gap:8px;align-items:center;}
+  .poi-search-row input{flex:1;min-width:0;background:var(--surface-1);border:1px solid var(--glass-border);border-radius:16px;padding:11px 13px;color:var(--text-primary);outline:none;font-size:14px;}
+  .poi-search-row input:focus{border-color:var(--accent);}
+  .poi-search-btn{border:0;border-radius:15px;padding:11px 14px;background:linear-gradient(135deg,var(--accent),var(--accent-strong));color:var(--on-accent);font-weight:700;cursor:pointer;white-space:nowrap;}
+  .poi-mode-row{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;}
+  .poi-mode-row::-webkit-scrollbar{display:none;}
+  .poi-mode{border:1px solid var(--glass-border);background:var(--surface-1);color:var(--text-secondary);border-radius:999px;padding:7px 11px;font-size:12px;cursor:pointer;white-space:nowrap;}
+  .poi-mode.active{background:var(--accent);border-color:var(--accent);color:var(--on-accent);}
+  .poi-results{display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto;scrollbar-width:none;}
+  .poi-results::-webkit-scrollbar{display:none;}
+  .poi-card{display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--glass-border);background:var(--surface-1);border-radius:17px;cursor:pointer;transition:transform .12s ease,background .15s ease;}
+  .poi-card:active{transform:scale(.985);}
+  .poi-pin{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--accent);position:relative;flex:none;}
+  .poi-pin:before{content:'';width:9px;height:9px;border:2px solid var(--on-accent);border-radius:50%;}
+  .poi-card-main{min-width:0;flex:1;}
+  .poi-name{font-size:14px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .poi-address{font-size:11.5px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;}
+  .poi-distance{font-size:11px;color:var(--text-faint);white-space:nowrap;}
+  .poi-empty{padding:12px;text-align:center;color:var(--text-secondary);font-size:12px;}
+
+  /* ===== 第二批：实时导航车辆图标 ===== */
+  .vehicle-marker{
+    width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    position:relative;transition:transform .18s ease,filter .18s ease;
+    filter:drop-shadow(0 3px 8px rgba(0,0,0,.28));
+  }
+  .vehicle-marker-core{
+    width:24px;height:30px;border-radius:9px 9px 7px 7px;
+    background:linear-gradient(180deg,#62e0c1,#169b83);
+    border:2px solid rgba(255,255,255,.95);position:relative;
+    box-shadow:0 0 0 4px rgba(50,190,160,.18);
+  }
+  .vehicle-marker-core:before{
+    content:'';position:absolute;left:5px;top:4px;width:10px;height:7px;border-radius:4px;
+    background:rgba(255,255,255,.72);
+  }
+  .vehicle-marker-core:after{
+    content:'';position:absolute;left:4px;bottom:4px;width:12px;height:3px;border-radius:4px;
+    background:rgba(0,0,0,.16);
+  }
+  .vehicle-marker.speeding .vehicle-marker-core{transform:scale(1.1);}
+  .vehicle-marker.speeding:after{
+    content:'';position:absolute;left:-10px;top:12px;width:8px;height:3px;border-radius:4px;
+    background:rgba(98,224,193,.75);box-shadow:-6px 7px 0 rgba(98,224,193,.48),-6px -7px 0 rgba(98,224,193,.48);
+  }
+  .vehicle-marker.pulse .vehicle-marker-core{animation:vehiclePulse 1.1s ease-in-out infinite;}
+  .vehicle-marker.off-route .vehicle-marker-core{
+    background:linear-gradient(180deg,#ffc15c,#e87919);
+    box-shadow:0 0 0 5px rgba(245,146,45,.2);
+    animation:offRouteFlash .8s ease-in-out infinite;
+  }
+  .vehicle-marker.arrived .vehicle-marker-core{
+    background:linear-gradient(180deg,#f7d77c,#c9952e);
+    box-shadow:0 0 0 6px rgba(245,205,92,.2);transform:scale(1.28);
+  }
+  body.theme-dark .vehicle-marker-core{border-color:rgba(255,255,255,.9);}
+  body.theme-dark .vehicle-marker:not(.off-route):not(.arrived) .vehicle-marker-core{
+    background:linear-gradient(180deg,#7cf0d1,#20b894);
+  }
+  @keyframes vehiclePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  @keyframes offRouteFlash{0%,100%{opacity:1}50%{opacity:.38}}
+
+
+  /* 第三至第五批：耀宝智能控制、导航体验、地点记忆 */
+  .memory-panel{margin-top:10px;padding:10px;border:1px solid var(--glass-border);border-radius:16px;background:var(--surface-1);}
+  .memory-title{font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px;}
+  .memory-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
+  .memory-btn{border:1px solid var(--glass-border);background:transparent;color:var(--text-secondary);border-radius:12px;padding:8px 5px;font-size:11px;cursor:pointer;}
+  .memory-btn:active{transform:scale(.98);}
+  .nav-metric{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .nav-metric span{padding:5px 8px;border-radius:999px;background:var(--surface-2);font-size:11px;color:var(--text-secondary);}
+  .vehicle-marker.fast .vehicle-marker-core:after{box-shadow:-7px 0 0 -1px rgba(255,255,255,.35),-12px 0 0 -1px rgba(255,255,255,.2);}
+  .vehicle-marker.arrived{animation:arrivedPop .7s ease-in-out infinite alternate;}
+  @keyframes arrivedPop{from{transform:scale(1)}to{transform:scale(1.28)}}
+
+
+    /* 商业化图标系统：统一使用简约线性图形，不再使用 Emoji */
+    .ui-icon{width:18px;height:18px;display:inline-block;vertical-align:-4px;position:relative;flex:0 0 18px;color:currentColor}
+    .ui-icon::before,.ui-icon::after{content:"";position:absolute;box-sizing:border-box}
+    .icon-pin::before{width:12px;height:15px;border:2px solid currentColor;border-radius:9px 9px 9px 9px;left:3px;top:1px;transform:rotate(0deg)}
+    .icon-pin::after{width:4px;height:4px;border:1.5px solid currentColor;border-radius:50%;left:7px;top:5px}
+    .icon-car::before{width:16px;height:8px;border:2px solid currentColor;border-radius:4px 4px 3px 3px;left:1px;top:6px}
+    .icon-car::after{width:4px;height:4px;border:2px solid currentColor;border-radius:50%;left:3px;top:12px;box-shadow:8px 0 0 -2px transparent,8px 0 0 0 currentColor}
+    .icon-compass::before{width:16px;height:16px;border:2px solid currentColor;border-radius:50%;left:1px;top:1px}
+    .icon-compass::after{width:2px;height:9px;background:currentColor;left:8px;top:4px;transform:rotate(38deg);transform-origin:50% 100%}
+    .icon-search::before{width:12px;height:12px;border:2px solid currentColor;border-radius:50%;left:1px;top:1px}
+    .icon-search::after{width:7px;height:2px;background:currentColor;left:11px;top:13px;transform:rotate(45deg);border-radius:2px}
+    .icon-save::before{width:14px;height:16px;border:2px solid currentColor;border-radius:2px;left:2px;top:1px}
+    .icon-save::after{width:7px;height:4px;border:1.5px solid currentColor;border-top:0;left:5px;top:3px}
+    .icon-folder::before{width:16px;height:12px;border:2px solid currentColor;border-radius:2px;left:1px;top:4px}
+    .icon-trash::before{width:11px;height:12px;border:2px solid currentColor;border-top:0;border-radius:0 0 2px 2px;left:3px;top:5px}
+    .icon-trash::after{width:14px;height:2px;background:currentColor;left:2px;top:3px;box-shadow:4px -3px 0 -0.5px currentColor}
+    .icon-target::before{width:15px;height:15px;border:2px solid currentColor;border-radius:50%;left:1px;top:1px}
+    .icon-target::after{width:5px;height:5px;background:currentColor;border-radius:50%;left:6px;top:6px}
+    .icon-road::before{width:14px;height:16px;border-left:2px solid currentColor;border-right:2px solid currentColor;left:2px;top:1px;transform:skew(-8deg)}
+    .icon-road::after{width:2px;height:14px;background:currentColor;left:8px;top:2px;opacity:.65}
+    .icon-sun::before{width:8px;height:8px;border:2px solid currentColor;border-radius:50%;left:5px;top:5px;box-shadow:0 -6px 0 -3px currentColor,0 6px 0 -3px currentColor,6px 0 0 -3px currentColor,-6px 0 0 -3px currentColor,4px 4px 0 -3px currentColor,-4px -4px 0 -3px currentColor,4px -4px 0 -3px currentColor,-4px 4px 0 -3px currentColor}
+    .icon-moon::before{width:15px;height:15px;border:2px solid currentColor;border-radius:50%;left:1px;top:1px}
+    .icon-moon::after{width:14px;height:14px;background:var(--surface, #0f1624);border-radius:50%;left:6px;top:-1px}
+    .icon-ai::before{width:14px;height:14px;border:2px solid currentColor;border-radius:4px;left:2px;top:2px}
+    .icon-ai::after{width:4px;height:4px;border:1.5px solid currentColor;border-radius:50%;left:7px;top:7px;box-shadow:-7px 0 0 -1px currentColor,7px 0 0 -1px currentColor,0 -7px 0 -1px currentColor,0 7px 0 -1px currentColor}
+    .icon-tag::before{width:15px;height:11px;border:2px solid currentColor;border-radius:3px;left:1px;top:3px;transform:rotate(-25deg)}
+    .icon-check::before{width:9px;height:5px;border-left:2px solid currentColor;border-bottom:2px solid currentColor;left:4px;top:5px;transform:rotate(-45deg)}
+    .icon-traffic::before{width:8px;height:16px;border:2px solid currentColor;border-radius:5px;left:5px;top:1px}
+    .icon-traffic::after{width:3px;height:3px;background:currentColor;border-radius:50%;left:7px;top:4px;box-shadow:0 5px 0 currentColor,0 10px 0 currentColor}
+    .icon-landscape::before{width:16px;height:12px;border:2px solid currentColor;border-radius:2px;left:1px;top:3px}
+    .icon-landscape::after{width:9px;height:9px;border-left:2px solid currentColor;border-top:2px solid currentColor;left:4px;top:5px;transform:rotate(45deg)}
+    .icon-plant::before{width:2px;height:12px;background:currentColor;left:8px;top:5px}
+    .icon-plant::after{width:10px;height:7px;border:2px solid currentColor;border-radius:10px 2px 10px 2px;left:2px;top:2px;transform:rotate(-20deg)}
+    .icon-barrier::before{width:16px;height:10px;border:2px solid currentColor;left:1px;top:4px;transform:skew(-12deg)}
+    .icon-flag::before{width:2px;height:16px;background:currentColor;left:3px;top:1px}
+    .icon-flag::after{width:11px;height:7px;border:2px solid currentColor;border-left:0;left:5px;top:2px}
+    .icon-close::before{width:15px;height:2px;background:currentColor;left:1px;top:8px;transform:rotate(45deg)}
+    .icon-close::after{width:15px;height:2px;background:currentColor;left:1px;top:8px;transform:rotate(-45deg)}
+    .icon-swap::before{content:"⇅";font-size:22px;line-height:18px;left:0;top:0}
+    .icon-speed::before{width:16px;height:8px;border:2px solid currentColor;border-bottom:0;border-radius:10px 10px 0 0;left:1px;top:7px}
+    .icon-speed::after{width:2px;height:8px;background:currentColor;left:8px;top:3px;transform:rotate(35deg);transform-origin:bottom}
+    .ui-icon + .ui-icon-label{margin-left:6px}
+
+  </style>
+</head>
+<body>
+
+<div class="app-frame" id="appFrame">
+
+<div id="map"></div>
+
+<!-- 顶部悬浮状态条 -->
+<div class="top-bar glass">
+  <div class="brand">
+    <span class="ai-orb" id="aiOrb"></span>
+    <div class="brand-text">
+      <strong>耀宝 · AI领航者</strong>
+      <small id="mapStatusText">地图加载中…</small>
+    </div>
+  </div>
+  <div class="top-bar-actions">
+    <button class="icon-btn" id="themeToggleBtn" title="夜间模式"><span class="ui-icon icon-moon"></span></button>
+    <button class="icon-btn bluetooth-status-btn" id="bluetoothStatusBtn" title="蓝牙音箱：未连接" aria-label="蓝牙音箱状态"><span class="icon-bluetooth" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20l5-5-5-5 5-5-5-5"></path><path d="M5 7l7 5-7 5"></path></svg></span></button>
+    <button class="icon-btn" id="historyToggleBtn" title="我的路线库"><span class="ui-icon icon-folder"></span></button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- 历史抽屉 -->
+<div class="drawer-mask" id="drawerMask"></div>
+<div class="history-drawer glass" id="historyPanel">
+  <div class="drawer-header">
+    <h3><span class="ui-icon icon-folder"></span><span class="ui-icon-label">我的路线库</span></h3>
+    <div style="display:flex;gap:8px;">
+      <button id="clearHistoryBtn" title="清空全部历史"><span class="ui-icon icon-trash"></span></button>
+      <button id="closeHistoryBtn">✕</button>
+    </div>
+  </div>
+  <div id="historyList" class="history-list">
+    <div class="history-empty">暂无保存的路线</div>
+  </div>
+</div>
+
+<!-- 底部悬浮卡片：默认收起，只露出把手 + AI输入框，点把手/输入框展开 -->
+<div class="bottom-sheet glass" id="bottomSheet">
+
+  <div class="sheet-handle" id="sheetHandle"><span></span></div>
+
+  <div class="ai-input-row">
+    <input type="text" id="aiInput" placeholder="跟耀宝说说你想去哪，比如“我不想走高速”">
+    <span class="voice-input-wrap" aria-label="语音输入与声源处理状态">
+      <button class="voice-btn" id="voiceInputBtn" title="语音输入" aria-label="语音输入">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path><path d="M8 21h8"></path>
+        </svg>
+      </button>
+      <span class="aec-status-dot" id="aecStatusDot" title="声源处理状态：空闲" aria-label="AEC声源处理状态"></span>
+    </span>
+    <button class="orb-btn" id="aiSendBtn">➤</button>
+  </div>
+
+  <div class="sheet-body" id="sheetBody">
+
+    <!-- 第一批：出行搜索引擎 -->
+    <div class="poi-search" id="poiSearchPanel">
+      <div class="poi-search-row">
+        <input type="text" id="poiSearchInput" placeholder="搜索地点、加油站、充电站…">
+        <button class="poi-search-btn" id="poiSearchBtn">搜索</button>
+      </div>
+      <div class="poi-mode-row">
+        <button class="poi-mode active" data-poi-mode="keyword">关键词</button>
+        <button class="poi-mode" data-poi-mode="nearby">附近</button>
+        <button class="poi-mode" data-poi-mode="along">沿途</button>
+      </div>
+      <div class="poi-results" id="poiResults" style="display:none;"></div>
+    </div>
+
+    <div class="route-result" id="routeResult" style="display:none;"></div>
+    <!-- 新增：多路线方案对比容器，后端支持 routes 数组时直接展示，未支持时由前端模拟。 -->
+    <div class="route-options" id="routeOptions" style="display:none;"></div>
+    <!-- 第五批：常用地点记忆 -->
+    <div class="memory-panel" id="memoryPanel">
+      <div class="memory-title">耀宝记忆</div>
+      <div class="memory-grid">
+        <button class="memory-btn" data-memory="home">家</button>
+        <button class="memory-btn" data-memory="work">公司</button>
+        <button class="memory-btn" data-memory="favorite">收藏</button>
+      </div>
+    </div>
+
+
+    <div class="point-row">
+      <div class="point-inputs">
+        <div class="point-field">
+          <span class="dot dot-start"></span>
+          <input type="text" id="startPoint" placeholder="起点" value="北京">
+          <button class="mini-btn" id="locateBtn" title="重新定位">⦿</button>
+        </div>
+        <div class="point-field">
+          <span class="dot dot-end"></span>
+          <input type="text" id="endPoint" placeholder="终点" value="西安">
+        </div>
+      </div>
+      <button class="mini-btn swap-btn" id="swapBtn" title="交换起终点">⇅</button>
+    </div>
+
+    <div class="tag-scroll">
+      <button class="tag-btn active" data-tag="红绿灯少"><span class="ui-icon icon-traffic"></span><span class="ui-icon-label">红绿灯少</span></button>
+      <button class="tag-btn" data-tag="风景好"><span class="ui-icon icon-landscape"></span><span class="ui-icon-label">风景好</span></button>
+      <button class="tag-btn" data-tag="高速多"><span class="ui-icon icon-road"></span><span class="ui-icon-label">高速多</span></button>
+      <button class="tag-btn" data-tag="避开拥堵"><span class="ui-icon icon-barrier"></span><span class="ui-icon-label">避开拥堵</span></button>
+      <button class="tag-btn" data-tag="新手友好"><span class="ui-icon icon-plant"></span><span class="ui-icon-label">新手友好</span></button>
+    </div>
+
+    <div class="action-row">
+      <button class="btn-ghost" id="saveRouteBtn"><span class="ui-icon icon-save"></span><span class="ui-icon-label">保存路线</span></button>
+      <button class="btn-primary" id="planBtn"><span class="ui-icon icon-car"></span><span class="ui-icon-label">规划路线</span></button>
+      <button class="btn-nav" id="navBtn"><span class="ui-icon icon-pin"></span><span class="ui-icon-label">开始导航</span></button>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- /.app-frame -->
+
+<script>
+  /* ============================================================
+     全局配置
+     ------------------------------------------------------------
+     需求1（安全）：高德 JS Key / 安全密钥不再写死在前端源码里，
+     而是启动时向后端要一份临时配置（见 loadMapConfigAndInit）。
+     真正敏感的地理编码 / 路线规划计算也不再由前端直接调高德接口，
+     而是统一经过自己的后端 /api/map/route 代理。
+
+     API_BASE：你自己的后端服务地址，按需修改。
+     后端实际实现的 3 个接口：
+       GET  /api/map/config   → 返回地图JS初始化用的 key / securityJsCode
+       POST /api/map/route    → 入参 {startPoint, endPoint, tags}，出参完整路线数据
+       POST /api/ai/chat      → 自然语言 → {startPoint, endPoint, preferenceTags}
+     ============================================================ */
+  var API_BASE = 'http://localhost:3000';
+
+  // ============================================================
+  //  本地 App / WKWebView 原生定位桥
+  //  ------------------------------------------------------------
+  //  浏览器里的 Geolocation 仍作为兼容兜底；真正打包成 iOS App 后，
+  //  原生层可通过 window.onNativeLocation(...) 把 CLLocation 坐标回传给页面。
+  //  这样“定位”不再依赖 Safari 的网页定位实现。
+  // ============================================================
+  var nativeLocationPending = false;
+  var nativeLocationTimer = null;
+
+  function isNativeAppContainer() {
+    return !!(
+      window.webkit &&
+      window.webkit.messageHandlers &&
+      window.webkit.messageHandlers.getLocation
+    );
+  }
+
+  function requestNativeLocation() {
+    if (!isNativeAppContainer()) return false;
+
+    nativeLocationPending = true;
+    clearTimeout(nativeLocationTimer);
+    nativeLocationTimer = setTimeout(function () {
+      nativeLocationPending = false;
+      showToast('⚠️ 原生定位响应超时，请检查 App 定位权限', 'error');
+    }, 10000);
+
+    try {
+      window.webkit.messageHandlers.getLocation.postMessage({ highAccuracy: true });
+      return true;
+    } catch (e) {
+      nativeLocationPending = false;
+      clearTimeout(nativeLocationTimer);
+      console.warn('[Native GPS] bridge error', e);
+      showToast('❌ 原生定位模块调用失败', 'error');
+      return false;
+    }
+  }
+
+  // iOS 原生层拿到 CLLocation 后调用：
+  // window.onNativeLocation({ latitude, longitude, accuracy, address })
+  window.onNativeLocation = function (payload) {
+    if (!payload || !Number.isFinite(Number(payload.latitude)) ||
+        !Number.isFinite(Number(payload.longitude))) {
+      nativeLocationPending = false;
+      clearTimeout(nativeLocationTimer);
+      showToast('❌ 原生定位返回的坐标无效', 'error');
+      return;
+    }
+
+    nativeLocationPending = false;
+    clearTimeout(nativeLocationTimer);
+
+    var position = new AMap.LngLat(
+      Number(payload.longitude),
+      Number(payload.latitude)
+    );
+    handleResolvedLocation(
+      position,
+      payload.address || '',
+      Number(payload.accuracy)
+    );
+  };
+
+  // ============================================================
+  //  1. 状态变量
+  // ============================================================
+  var map = null;
+  var geolocation = null;   // 高德 GPS 定位插件实例
+  var userMarker = null;    // 我们自己画的定位点（替代高德默认图标，修复偏移问题）
+  var liveWatchId = null;
+  var liveNavigating = false;
+  var routePath = [];
+  var traveledPath = [];
+  var traveledPolyline = null;
+  var lastRerouteAt = 0;
+  var lastLivePosition = null;
+  var lastLiveAddress = '';
+  var liveCompleteListener = null;
+  var liveErrorListener = null;
+  var currentPolyline = null;
+  var currentMarkers = [];
+  var currentRouteData = null;
+  var currentPoiMarkers = [];
+  var currentPoiMode = 'keyword';
+  var currentPoiResults = [];
+  var selectedTags = ['红绿灯少'];
+  var toastTimer = null;
+  var isPlanning = false;   // 需求5：规划请求进行中的锁，防止重复点击/回车触发并发请求
+  // 第二批：导航状态机与状态持久化
+  var navigationState = localStorage.getItem('navigationState') || 'idle';
+  var backgroundNavigationState = null;
+  var lastHeading = null;
+  var lastSpeed = 0;
+  var lastPositionForHeading = null;
+  var navigationRestored = false;
+  // 需求4：记录"用户手动输入"的起点（区别于GPS自动填入），定位失败时用它兜底回填
+  var lastManualStartPoint = document.getElementById('startPoint').value.trim();
+  // 夜间模式：默认浅色，读取上次选择；地图样式、CSS变量都跟这个状态走
+  var currentTheme = localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
+  applyTheme(currentTheme); // 尽早应用，避免刷新时先浅后深闪一下
+
+  var routeHistory = JSON.parse(localStorage.getItem('routeHistory') || '[]');
+
+  // ============================================================
+  //  1.5 网络请求超时与重试（需求6）
+  //  ------------------------------------------------------------
+  //  所有 fetch 统一走这里：15秒超时用 AbortController 中断，
+  //  超时（AbortError）后自动重试一次；其他错误（网络断开、后端500等）
+  //  不重试，直接抛给调用方处理，避免掩盖真实错误。
+  // ============================================================
+  function fetchOnce(url, options, timeoutMs) {
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, timeoutMs);
+    var opts = Object.assign({}, options || {}, { signal: controller.signal });
+    return fetch(url, opts).finally(function () { clearTimeout(timer); });
+  }
+
+  function fetchWithTimeout(url, options, timeoutMs) {
+    timeoutMs = timeoutMs || 15000;
+    return fetchOnce(url, options, timeoutMs).catch(function (err) {
+      if (err && err.name === 'AbortError') {
+        // 超时后自动重试一次
+        return fetchOnce(url, options, timeoutMs);
+      }
+      throw err;
+    });
+  }
+
+  // ============================================================
+  //  2. Toast & AI 状态指示
+  // ============================================================
+  // 安全工具：把任何要塞进 innerHTML 的动态文本先转义，
+  // 防止用户在起点/终点/AI对话框里输入的内容被当成 HTML/JS 执行（XSS）。
+  // 规则很简单：只要不是我们自己写死的静态字符串，进 innerHTML 之前都过一遍这个函数。
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function showToast(msg, type) {
+    var toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'show' + (type ? ' toast-' + type : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      toast.className = '';
+    }, 2600);
+  }
+
+  // 第二批：统一管理导航状态，所有状态切换都从这里更新 UI 与本地存储。
+  function setNavigationState(nextState, reason) {
+    var allowed = ['idle', 'planning', 'navigating', 'offRoute', 'rerouting', 'arrived'];
+    if (allowed.indexOf(nextState) === -1) return;
+    navigationState = nextState;
+    localStorage.setItem('navigationState', nextState);
+
+    var btn = document.getElementById('navBtn');
+    var statusMap = {
+      idle: '地图已就绪',
+      planning: '正在规划路线…',
+      navigating: '导航进行中 · 实时追踪',
+      offRoute: '已偏离路线 · 正在处理',
+      rerouting: '正在重新规划路线…',
+      arrived: '已到达目的地'
+    };
+    var buttonMap = {
+      idle: '<span class="ui-icon icon-pin"></span><span class="ui-icon-label">开始导航</span>',
+      planning: '<span class="ui-icon icon-speed"></span><span class="ui-icon-label">规划中…</span>',
+      navigating: '<span class="ui-icon icon-close"></span><span class="ui-icon-label">停止导航</span>',
+      offRoute: '<span class="ui-icon icon-compass"></span> 偏航处理中…',
+      rerouting: '<span class="ui-icon icon-compass"></span> 重新规划中…',
+      arrived: '<span class="ui-icon icon-check"></span><span class="ui-icon-label">已到达</span>'
+    };
+    updateMapStatus(reason || statusMap[nextState]);
+    if (btn) {
+      btn.innerHTML = buttonMap[nextState];
+      btn.classList.toggle('active', nextState === 'navigating' || nextState === 'offRoute' || nextState === 'rerouting');
+      btn.disabled = nextState === 'planning' || nextState === 'rerouting';
+    }
+  }
+
+  function persistNavigationSnapshot() {
+    if (!currentRouteData || !routePath.length) return;
+    var snapshot = {
+      state: navigationState,
+      route: currentRouteData,
+      path: routePath,
+      startPoint: document.getElementById('startPoint').value.trim(),
+      endPoint: document.getElementById('endPoint').value.trim(),
+      savedAt: Date.now()
+    };
+    localStorage.setItem('navigationSnapshot', JSON.stringify(snapshot));
+  }
+
+  function clearNavigationSnapshot() {
+    localStorage.removeItem('navigationSnapshot');
+  }
+
+  function updateVehicleMarker(position, heading, speed, state) {
+    if (!map || !position) return;
+    var normalizedSpeed = Number.isFinite(Number(speed)) ? Number(speed) : 0;
+    var scaleState = normalizedSpeed > 3 ? ' speeding' : '';
+    var pulseState = normalizedSpeed > 0.5 ? ' pulse' : '';
+    var stateClass = state === 'offRoute' || state === 'rerouting' ? ' off-route' : (state === 'arrived' ? ' arrived' : '');
+    var darkClass = currentTheme === 'dark' ? ' dark' : '';
+    var deg = Number.isFinite(Number(heading)) ? Number(heading) : 0;
+    var html = '<div class="vehicle-marker' + scaleState + pulseState + stateClass + darkClass + '" style="transform:rotate(' + deg.toFixed(1) + 'deg)">' +
+      '<div class="vehicle-marker-core"></div></div>';
+    if (!userMarker) {
+      userMarker = new AMap.Marker({ position: position, content: html, offset: new AMap.Pixel(-19, -19), zIndex: 300 });
+      map.add(userMarker);
+    } else {
+      userMarker.setPosition(position);
+      userMarker.setContent(html);
+    }
+  }
+
+  // 第二批：没有 GPS heading 时，用相邻两个位置计算移动方向角。
+  function calculateBearing(from, to) {
+    if (!from || !to) return null;
+    var lat1 = Number(from.getLat()) * Math.PI / 180;
+    var lat2 = Number(to.getLat()) * Math.PI / 180;
+    var dLon = (Number(to.getLng()) - Number(from.getLng())) * Math.PI / 180;
+    var y = Math.sin(dLon) * Math.cos(lat2);
+    var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    var deg = Math.atan2(y, x) * 180 / Math.PI;
+    return (deg + 360) % 360;
+  }
+
+  function getNavigationEndPosition() {
+    if (currentRouteData && Array.isArray(currentRouteData.endLngLat) && currentRouteData.endLngLat.length >= 2) {
+      return new AMap.LngLat(Number(currentRouteData.endLngLat[0]), Number(currentRouteData.endLngLat[1]));
+    }
+    if (currentMarkers.length > 1 && currentMarkers[1].getPosition) return currentMarkers[1].getPosition();
+    return null;
+  }
+
+  function checkArrival(position) {
+    var end = getNavigationEndPosition();
+    if (!end || !position || !AMap.GeometryUtil) return false;
+    var distance = AMap.GeometryUtil.distance(position, end);
+    if (distance < 50) {
+      if (navigationState !== 'arrived') {
+        liveNavigating = false;
+        if (geolocation && liveWatchId !== null) { try { geolocation.clearWatch(liveWatchId); } catch (e) {} }
+        liveWatchId = null;
+        setNavigationState('arrived', '已到达目的地 · 距终点约 ' + Math.round(distance) + 'm');
+        updateVehicleMarker(position, lastHeading, 0, 'arrived');
+        showToast('<span class="ui-icon icon-check"></span><span class="ui-icon-label">已到达</span>目的地', 'success');
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          var utter = new SpeechSynthesisUtterance('已到达目的地');
+          utter.lang = 'zh-CN'; utter.rate = 1; window.speechSynthesis.speak(utter);
+        }
+        var endMarker = currentMarkers.length > 1 ? currentMarkers[1] : null;
+        if (endMarker) endMarker.setLabel({ content: '终点 · 已到达', offset: new AMap.Pixel(0, -30) });
+        clearNavigationSnapshot();
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function persistRouteForNavigation() {
+    persistNavigationSnapshot();
+  }
+
+  function restoreNavigationSnapshot() {
+    var raw = localStorage.getItem('navigationSnapshot');
+    if (!raw) return;
+    try {
+      var snapshot = JSON.parse(raw);
+      if (!snapshot || !Array.isArray(snapshot.path) || snapshot.path.length < 2) return;
+      if (snapshot.state === 'arrived' || snapshot.state === 'idle') return;
+      document.getElementById('startPoint').value = snapshot.startPoint || (snapshot.route && snapshot.route.from) || '';
+      document.getElementById('endPoint').value = snapshot.endPoint || (snapshot.route && snapshot.route.to) || '';
+      currentRouteData = snapshot.route || null;
+      routePath = snapshot.path;
+      if (!map) return;
+      if (currentPolyline) map.remove(currentPolyline);
+      currentPolyline = new AMap.Polyline({ path: routePath, strokeColor: currentTheme === 'dark' ? '#0a84ff' : '#007aff', strokeWeight: 7, strokeStyle: 'solid', strokeOpacity: .95, lineJoin: 'round', lineCap: 'round', zIndex: 100 });
+      map.add(currentPolyline);
+      var fromPos = snapshot.route && snapshot.route.fromLngLat ? snapshot.route.fromLngLat : routePath[0];
+      var toPos = snapshot.route && snapshot.route.endLngLat ? snapshot.route.endLngLat : routePath[routePath.length - 1];
+      currentMarkers.forEach(function(m){ map.remove(m); });
+      currentMarkers = [
+        new AMap.Marker({ position: fromPos, title: '起点', offset: new AMap.Pixel(-12,-36), label: { content: '起点', offset: new AMap.Pixel(0,-30) } }),
+        new AMap.Marker({ position: toPos, title: '终点', offset: new AMap.Pixel(-12,-36), label: { content: '终点', offset: new AMap.Pixel(0,-30) } })
+      ];
+      map.add(currentMarkers[0]); map.add(currentMarkers[1]);
+      navigationRestored = true;
+      setNavigationState(snapshot.state, '已恢复上次导航状态');
+      showToast('已恢复未完成的导航', 'success');
+    } catch (e) {
+      console.warn('[Navigation] 状态恢复失败', e);
+    }
+  }
+
+  function updateMapStatus(text) {
+    document.getElementById('mapStatusText').textContent = text;
+  }
+
+  function setAiState(state) {
+    var orb = document.getElementById('aiOrb');
+    orb.className = 'ai-orb' + (state && state !== 'idle' ? ' ' + state : '');
+  }
+
+  // ============================================================
+  //  2.4 本地设备状态：蓝牙 + AEC
+  //  ------------------------------------------------------------
+  //  Linux 耀宝本体在 127.0.0.1:3900 提供状态；前端仅轮询展示，
+  //  不改变原有地图/AI业务逻辑。
+  // ============================================================
+  // 新增：根据当前页面地址自动判断运行环境。
+  // localhost / 127.0.0.1 / 192.168.x.x 视为实体硬件环境；其他域名视为普通网页环境。
+  var DEVICE_ENV_IS_HARDWARE = (function () {
+    var host = (window.location.hostname || '').toLowerCase();
+    return host === 'localhost' ||
+           host === '127.0.0.1' ||
+           /^192\.168\.(?:0|[1-9]\d{0,2})\.(?:0|[1-9]\d{0,2})$/.test(host);
+  })();
+
+  // 新增：实体硬件环境才连接本地 3900 服务，公网网页环境保持为空，避免
+  // 浏览器误请求用户自己电脑上的 127.0.0.1:3900。
+  var DEVICE_STATUS_BASE = DEVICE_ENV_IS_HARDWARE ? 'http://127.0.0.1:3900' : '';
+  var deviceStatusTimer = null;
+
+  function updateDeviceStatus(status) {
+    status = status || {};
+    var bt = status.bluetooth || {};
+    var connected = !!(status.bluetooth_connected || bt.connected);
+    var aecActive = !!(status.aec_active || status.audio_playing || status.tts_active);
+
+    var btBtn = document.getElementById('bluetoothStatusBtn');
+    if (btBtn) {
+      btBtn.classList.toggle('connected', connected);
+      btBtn.title = connected ? '蓝牙音箱：已连接' : '蓝牙音箱：未连接';
+      btBtn.setAttribute('aria-label', btBtn.title);
+    }
+
+    var aecDot = document.getElementById('aecStatusDot');
+    if (aecDot) {
+      aecDot.classList.toggle('active', aecActive);
+      aecDot.title = aecActive ? '声源处理：AEC回声消除处理中，此时说话可能识别不准' : '声源处理：空闲';
+      aecDot.setAttribute('aria-label', aecDot.title);
+    }
+  }
+
+  async function pollDeviceStatus() {
+    // 新增：普通网页环境没有本地 3900 服务，直接跳过，不发起任何请求。
+    if (!DEVICE_ENV_IS_HARDWARE || !DEVICE_STATUS_BASE) return;
+
+    try {
+      var response = await fetchWithTimeout(DEVICE_STATUS_BASE + '/status', { method: 'GET' }, 2500);
+      if (!response.ok) throw new Error('DEVICE_STATUS_' + response.status);
+      var data = await response.json();
+      updateDeviceStatus(data);
+    } catch (error) {
+      // 本地设备服务未启动时保持灰色，不干扰地图与AI功能。
+      updateDeviceStatus({ bluetooth_connected: false, aec_active: false });
+    }
+  }
+
+  function startDeviceStatusPolling() {
+    // 新增：只有实体硬件环境才启动 2 秒一次的本地设备状态轮询。
+    if (!DEVICE_ENV_IS_HARDWARE || !DEVICE_STATUS_BASE) return;
+    pollDeviceStatus();
+    if (deviceStatusTimer) clearInterval(deviceStatusTimer);
+    deviceStatusTimer = setInterval(pollDeviceStatus, 2000);
+  }
+
+  // ============================================================
+  //  2.5 夜间模式
+  //  ------------------------------------------------------------
+  //  颜色全部走 CSS 变量（body.theme-dark 覆盖 :root），这里只需要
+  //  切一个 class；地图本身不认 CSS，单独用 setMapStyle 联动。
+  // ============================================================
+  function applyTheme(theme) {
+    currentTheme = theme;
+    document.body.classList.toggle('theme-dark', theme === 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = theme === 'dark' ? '<span class="ui-icon icon-sun"></span>' : '<span class="ui-icon icon-moon"></span>';
+    localStorage.setItem('theme', theme);
+    if (map) {
+      map.setMapStyle(theme === 'dark' ? 'amap://styles/dark' : 'amap://styles/whitesmoke');
+    }
+  }
+
+  function toggleTheme() {
+    applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+  }
+
+  // ============================================================
+  //  2.6 底部卡片展开/收起
+  //  ------------------------------------------------------------
+  //  默认收起（只露把手+AI输入框），点把手切换；点AI输入框、
+  //  或者规划出结果时自动展开，方便看到结果。
+  // ============================================================
+  function setSheetExpanded(expanded) {
+    var sheet = document.getElementById('bottomSheet');
+    sheet.classList.toggle('expanded', expanded);
+  }
+  function toggleSheet() {
+    var sheet = document.getElementById('bottomSheet');
+    setSheetExpanded(!sheet.classList.contains('expanded'));
+  }
+
+  // ============================================================
+  //  3. 语音播报
+  //  ------------------------------------------------------------
+  //  需求6：iOS Safari 对 speechSynthesis 有"必须由用户手势直接触发"
+  //  的限制，经过 setTimeout / 网络请求之后再调用很容易被静音拦截。
+  //  所以这里新增 speak 开关：只有真正由按钮点击 / 回车这类同步用户
+  //  操作发起的规划才会传 speak=true；AI 自动触发的规划固定传 false。
+  // ============================================================
+  function speakRouteInfo(from, to, distance, duration) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel(); // 先取消旧播报，避免多条播报重叠
+    var text = '从' + from + '到' + to + '，全程约' + distance + '公里，预计需要' + duration + '分钟';
+    var utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'zh-CN';
+    utter.rate = 1;
+    utter.onstart = function () { setAiState('speaking'); };
+    utter.onend = function () { setAiState('idle'); };
+    utter.onerror = function () { setAiState('idle'); };
+    window.speechSynthesis.speak(utter);
+  }
+
+  // ============================================================
+  //  4. 地图初始化
+  //  ------------------------------------------------------------
+  //  需求1：Key 和安全密钥改为运行时从后端拉取，而不是写死在 HTML 里。
+  //  拉取失败时给出明确提示，不阻塞页面其他功能。
+  // ============================================================
+  async function loadMapConfigAndInit() {
+    updateMapStatus('正在获取地图配置…');
+    try {
+      var res = await fetchWithTimeout(API_BASE + '/api/map/config', {}, 15000);
+      var cfg = await res.json();
+      if (!cfg || !cfg.key) {
+        throw new Error('后端未返回有效的地图配置');
+      }
+      // 高德要求安全密钥必须在加载 JS SDK 之前挂到 window 上
+      window._AMapSecurityConfig = { securityJsCode: cfg.securityJsCode };
+
+      var script = document.createElement('script');
+      script.src = 'https://webapi.amap.com/maps?v=2.0&key=' + encodeURIComponent(cfg.key);
+      script.onload = initMap;
+      script.onerror = function () {
+        updateMapStatus('地图脚本加载失败');
+        showToast('❌ 高德地图脚本加载失败，请检查网络', 'error');
+      };
+      document.head.appendChild(script);
+    } catch (err) {
+      // 后端还没实现时会走到这里：给出清晰提示，方便你对照 backend-api.md 去实现接口
+      updateMapStatus('无法连接地图配置服务');
+      if (err && err.name === 'AbortError') {
+        showToast('⏱️ 获取地图配置超时，请检查后端是否正常运行', 'error');
+      } else {
+        showToast('⚠️ 未能从后端获取地图Key，请先实现 /api/map/config 接口', 'error');
+      }
+    }
+  }
+
+  function initMap() {
+    if (typeof AMap === 'undefined') {
+      updateMapStatus('地图加载失败');
+      showToast('❌ 地图SDK加载失败', 'error');
+      return;
+    }
+
+    map = new AMap.Map('map', {
+      zoom: 12,
+      center: [116.397428, 39.90923],
+      viewMode: '2D',
+      mapStyle: currentTheme === 'dark' ? 'amap://styles/dark' : 'amap://styles/whitesmoke',
+      features: ['bg', 'road', 'building', 'point']
+    });
+
+    // 需求8：地图初始化后主动 resize 一次，避免因布局尚未完全稳定
+    // （比如安全区 / 毛玻璃层还在渲染）导致地图容器尺寸计算错误，
+    // 这是"定位点看起来偏移"最常见的根因——不是坐标算错了，
+    // 而是地图容器的实际像素尺寸和 AMap 内部缓存的不一致。
+    map.resize();
+
+    AMap.plugin(['AMap.Scale', 'AMap.Geolocation', 'AMap.GeometryUtil'], function () {
+      map.addControl(new AMap.Scale());
+
+      geolocation = new AMap.Geolocation({
+        enableHighAccuracy: true,
+        timeout: 8000,
+        needAddress: true,
+        convert: true,
+        extensions: 'all',
+        showButton: false,
+        // 需求8：关闭高德内置的默认定位蓝点，改用我们自己的 Marker，
+        // 这样锚点偏移完全由我们自己控制，不受 SDK 内部默认图标影响
+        showMarker: false,
+        showCircle: false
+      });
+      map.addControl(geolocation);
+
+      updateMapStatus('地图已就绪');
+      doLocate(true);
+      restoreNavigationSnapshot();
+    });
+  }
+
+  // 浏览器/设备旋转、地址栏收起展开都可能改变可视区域尺寸，
+  // 统一在这里调用 map.resize()，避免定位点/路线跟视觉容器错位
+  window.addEventListener('resize', function () {
+    if (map) map.resize();
+  });
+
+  // ============================================================
+  //  5. GPS 定位
+  //  ------------------------------------------------------------
+  //  需求7：不再写死 zoom=15，改用 setFitView 自动适应视野
+  //  需求8：使用自定义 Marker + 手动 offset，替代默认定位图标
+  // ============================================================
+  function handleResolvedLocation(position, addr, accuracy) {
+    if (addr) {
+      document.getElementById('startPoint').value = addr;
+    }
+
+    if (userMarker) {
+      map.remove(userMarker);
+      userMarker = null;
+    }
+
+    userMarker = new AMap.Marker({
+      position: position,
+      content: '<div class="user-dot"></div>',
+      offset: new AMap.Pixel(-10, -10),
+      zIndex: 200
+    });
+    map.add(userMarker);
+
+    map.resize();
+    map.setFitView([userMarker], false, [80, 80, 80, 80], 16);
+
+    updateMapStatus(
+      '已定位到当前位置' +
+      (Number.isFinite(accuracy) ? ' · 精度约 ' + Math.round(accuracy) + 'm' : '')
+    );
+    showToast('✅ 定位成功，已自动填入起点', 'success');
+  }
+
+  function doLocate(silent) {
+    if (!map) {
+      showToast('地图还没准备好，稍等一下', 'error');
+      return;
+    }
+
+    if (!silent) showToast('定位：正在获取当前位置…');
+
+    // 真正打包成 iOS App 后优先走原生 CLLocation。
+    // Safari / 普通浏览器环境没有这个桥接对象时，再走高德 Web Geolocation。
+    if (requestNativeLocation()) {
+      updateMapStatus('正在使用原生 GPS 定位…');
+      return;
+    }
+
+    if (!geolocation) {
+      showToast('地图定位模块还没准备好，稍等一下', 'error');
+      return;
+    }
+
+    geolocation.getCurrentPosition(function (status, result) {
+      if (status === 'complete' && result && result.position) {
+        handleResolvedLocation(
+          result.position,
+          result.formattedAddress || '',
+          Number(result.accuracy)
+        );
+      } else {
+        document.getElementById('startPoint').value = lastManualStartPoint;
+        updateMapStatus('定位失败，已保留手动输入的起点');
+        showToast('⚠️ 定位失败，已回退到你手动输入的起点', 'error');
+      }
+    });
+  }
+
+  // ============================================================
+  //  6. 实时导航追踪
+  //  ------------------------------------------------------------
+  //  使用高德 Geolocation 的持续定位能力：位置变化 -> 更新车辆点 ->
+  //  地图跟随 -> 判断是否偏离路线 -> 必要时从当前位置重新规划。
+  //  这里是“实况位置追踪”，不是伪造车辆动画。
+  // ============================================================
+  function updateLiveMarker(position, heading, speed) {
+    // 第二批：统一使用动态车辆图标，方向/速度/导航状态由 updateVehicleMarker 处理。
+    updateVehicleMarker(position, heading, speed, navigationState);
+  }
+
+  function updateTraveledPath(position) {
+    traveledPath.push(position);
+    if (traveledPath.length > 1) {
+      if (!traveledPolyline) {
+        traveledPolyline = new AMap.Polyline({
+          path: traveledPath,
+          strokeColor: '#6ee7c8',
+          strokeWeight: 7,
+          strokeOpacity: 0.9,
+          lineJoin: 'round',
+          lineCap: 'round',
+          zIndex: 150,
+        });
+        map.add(traveledPolyline);
+      } else {
+        traveledPolyline.setPath(traveledPath);
+      }
+    }
+  }
+
+  function updateLiveStatus(position, accuracy) {
+    var accuracyText = Number.isFinite(accuracy) ? ' · 精度约 ' + Math.round(accuracy) + 'm' : '';
+    updateMapStatus('实况导航中 · GPS 已更新' + accuracyText);
+  }
+
+  async function maybeReroute(position) {
+    if (!routePath.length || !document.getElementById('endPoint').value.trim()) return;
+
+    var distanceToRoute = AMap.GeometryUtil.distanceToLine(position, routePath);
+    var now = Date.now();
+
+    // GPS 抖动不立即重算；连续偏离到 80m 以上且距离上次重算至少 20 秒才触发。
+    if (distanceToRoute <= 80 || now - lastRerouteAt < 20000) {
+      if (navigationState === 'offRoute') setNavigationState('navigating');
+      return;
+    }
+
+    lastRerouteAt = now;
+    setNavigationState('offRoute', '已偏离路线 · 正在重新规划');
+    updateVehicleMarker(position, lastHeading, lastSpeed, 'offRoute');
+    showToast('<span class="ui-icon icon-compass"></span> 检测到偏离路线，正在重新规划…');
+    setNavigationState('rerouting', '正在重新规划路线…');
+    try {
+      var end = document.getElementById('endPoint').value.trim();
+      var data = await requestRoutePlan(
+        position.getLng() + ',' + position.getLat(),
+        end,
+        selectedTags
+      );
+
+      if (data && data.success === true && Array.isArray(data.path) && data.path.length > 1) {
+        applyRouteData(data, false);
+        setNavigationState('navigating', '已按当前位置重新规划 · 导航中');
+        persistRouteForNavigation();
+        updateVehicleMarker(position, lastHeading, lastSpeed, 'navigating');
+        showToast('✅ 已按当前位置重新规划', 'success');
+      } else {
+        setNavigationState('offRoute', '偏航中 · 等待重新规划');
+      }
+    } catch (err) {
+      setNavigationState('offRoute', '偏航中 · 重新规划失败');
+      updateVehicleMarker(position, lastHeading, lastSpeed, 'offRoute');
+      showToast('⚠️ 重新规划失败，继续沿当前路线追踪', 'error');
+    }
+  }
+
+  function onLiveLocation(status, result) {
+    if (!liveNavigating || status !== 'complete' || !result || !result.position) return;
+
+    var position = result.position;
+    lastLivePosition = position;
+    if (result.formattedAddress) lastLiveAddress = result.formattedAddress;
+
+    var gpsHeading = Number(result.heading);
+    var heading = Number.isFinite(gpsHeading) && gpsHeading >= 0 ? gpsHeading : calculateBearing(lastPositionForHeading, position);
+    if (Number.isFinite(heading)) lastHeading = heading;
+    lastPositionForHeading = position;
+    lastSpeed = Number.isFinite(Number(result.speed)) ? Number(result.speed) : 0;
+
+    if (checkArrival(position)) return;
+
+    updateLiveMarker(position, lastHeading, lastSpeed);
+    updateTraveledPath(position);
+    updateLiveStatus(position, result.accuracy);
+
+    // 导航模式下地图跟随当前位置，而不是每次重新 fitView 把路线缩成一条线。
+    if (map && navigationState !== 'arrived') map.setCenter(position);
+
+    maybeReroute(position);
+    persistRouteForNavigation();
+  }
+
+  function onLiveLocationError(error) {
+    if (!liveNavigating) return;
+    updateMapStatus('实况定位暂时失败');
+    showToast('⚠️ GPS 定位暂时失败，请检查定位权限', 'error');
+    console.warn('[GPS] live location error', error);
+  }
+
+  function startNavigation() {
+    if (!routePath.length) {
+      showToast('请先规划路线再开始导航', 'error');
+      return;
+    }
+    if (!geolocation) {
+      showToast('地图定位模块还没准备好', 'error');
+      return;
+    }
+    if (liveNavigating) return;
+
+    liveNavigating = true;
+    traveledPath = [];
+    lastRerouteAt = 0;
+    lastLivePosition = null;
+    lastPositionForHeading = null;
+    lastHeading = null;
+    lastSpeed = 0;
+    setNavigationState('navigating', '导航进行中 · 正在获取实时位置');
+
+    if (traveledPolyline) {
+      map.remove(traveledPolyline);
+      traveledPolyline = null;
+    }
+
+    if (liveCompleteListener) AMap.event.removeListener(liveCompleteListener);
+    if (liveErrorListener) AMap.event.removeListener(liveErrorListener);
+    liveCompleteListener = AMap.event.addListener(geolocation, 'complete', onLiveLocation);
+    liveErrorListener = AMap.event.addListener(geolocation, 'error', onLiveLocationError);
+
+    liveWatchId = geolocation.watchPosition();
+    persistRouteForNavigation();
+    showToast('定位：实时导航已启动', 'success');
+  }
+
+  function stopNavigation() {
+    liveNavigating = false;
+    if (geolocation && liveWatchId !== null) {
+      try { geolocation.clearWatch(liveWatchId); } catch (e) {}
+    }
+    liveWatchId = null;
+
+    if (liveCompleteListener) {
+      AMap.event.removeListener(liveCompleteListener);
+      liveCompleteListener = null;
+    }
+    if (liveErrorListener) {
+      AMap.event.removeListener(liveErrorListener);
+      liveErrorListener = null;
+    }
+
+    clearNavigationSnapshot();
+    setNavigationState('idle', '实况导航已停止');
+    showToast('已停止实况导航');
+  }
+
+  function toggleNavigation() {
+    if (navigationState === 'arrived') {
+      clearNavigationSnapshot();
+      setNavigationState('idle');
+      return;
+    }
+    if (liveNavigating) stopNavigation();
+    else startNavigation();
+  }
+
+  // 第二批：页面进入后台时记录状态，回到前台后恢复监听与偏航检测。
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      backgroundNavigationState = navigationState;
+      if (liveNavigating) {
+        persistRouteForNavigation();
+        updateMapStatus('导航在后台运行 · 返回后恢复跟随');
+      }
+      return;
+    }
+
+    if (backgroundNavigationState && backgroundNavigationState !== 'idle' && backgroundNavigationState !== 'arrived') {
+      if (liveNavigating && geolocation && liveWatchId === null) {
+        if (liveCompleteListener) AMap.event.removeListener(liveCompleteListener);
+        liveCompleteListener = AMap.event.addListener(geolocation, 'complete', onLiveLocation);
+        liveWatchId = geolocation.watchPosition();
+      }
+      if (lastLivePosition) {
+        if (checkArrival(lastLivePosition)) return;
+        updateVehicleMarker(lastLivePosition, lastHeading, lastSpeed, navigationState);
+        map.setCenter(lastLivePosition);
+        maybeReroute(lastLivePosition);
+      }
+      setNavigationState(navigationState, '已恢复导航跟随 · 正在检查路线');
+    }
+  });
+
+
+  // ============================================================
+  //  5.5 第一批：POI 搜索引擎
+  //  前端只负责组装参数、展示结果、在地图上标记 POI；后端实现 /api/map/poi。
+  // ============================================================
+  function getCurrentLocationValue() {
+    if (lastLivePosition) {
+      return lastLivePosition.getLng() + ',' + lastLivePosition.getLat();
+    }
+    if (userMarker && userMarker.getPosition) {
+      var p = userMarker.getPosition();
+      return p.getLng() + ',' + p.getLat();
+    }
+    return '';
+  }
+
+  function normalizePoiList(data) {
+    var list = [];
+    if (Array.isArray(data)) list = data;
+    else if (data && Array.isArray(data.poiList)) list = data.poiList;
+    else if (data && Array.isArray(data.pois)) list = data.pois;
+    else if (data && data.data && Array.isArray(data.data.pois)) list = data.data.pois;
+    else if (data && data.data && Array.isArray(data.data)) list = data.data;
+
+    return list.map(function (item, index) {
+      var loc = item.location || item.lnglat || item.position || item.center || '';
+      var lng = item.lng != null ? item.lng : (item.longitude != null ? item.longitude : null);
+      var lat = item.lat != null ? item.lat : (item.latitude != null ? item.latitude : null);
+      if ((!lng || !lat) && typeof loc === 'string' && loc.indexOf(',') > -1) {
+        var parts = loc.split(','); lng = parts[0]; lat = parts[1];
+      } else if ((!lng || !lat) && Array.isArray(loc)) {
+        lng = loc[0]; lat = loc[1];
+      }
+      return {
+        id: item.id || item.uid || ('poi_' + index),
+        name: item.name || item.title || '未命名地点',
+        address: item.address || item.addr || '',
+        type: item.type || item.typecode || '',
+        distance: item.distance != null ? item.distance : '',
+        lng: Number(lng),
+        lat: Number(lat)
+      };
+    }).filter(function (item) { return Number.isFinite(item.lng) && Number.isFinite(item.lat); });
+  }
+
+  async function searchPoi(keyword, mode) {
+    mode = mode || currentPoiMode;
+    keyword = (keyword || '').trim();
+    var location = getCurrentLocationValue();
+    var routeId = currentRouteData && currentRouteData.routeId ? currentRouteData.routeId : '';
+
+    if (mode !== 'keyword' && !location) {
+      showToast('请先获取当前位置，再使用附近搜索', 'error');
+      return;
+    }
+    if (mode === 'along' && !routeId) {
+      showToast('请先规划路线，再使用沿途搜索', 'error');
+      return;
+    }
+    if (!keyword) keyword = '附近地点';
+
+    var box = document.getElementById('poiResults');
+    box.style.display = 'flex';
+    box.innerHTML = '<div class="poi-empty">正在搜索…</div>';
+
+    try {
+      var res = await fetchWithTimeout(API_BASE + '/api/map/poi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keyword: keyword,
+          location: location,
+          type: '',
+          routeId: routeId
+        })
+      }, 15000);
+      var data = await res.json();
+      if (!res.ok) throw new Error(data && data.message ? data.message : 'POI 搜索失败');
+
+      currentPoiResults = normalizePoiList(data);
+      renderPoiResults(currentPoiResults);
+      showToast(currentPoiResults.length ? '搜索完成' : '没有找到相关地点', currentPoiResults.length ? 'success' : 'error');
+    } catch (err) {
+      currentPoiResults = [];
+      box.innerHTML = '<div class="poi-empty">搜索服务暂不可用，请稍后重试</div>';
+      showToast('❌ 无法连接搜索服务', 'error');
+    }
+  }
+
+  function renderPoiResults(list) {
+    var box = document.getElementById('poiResults');
+    box.style.display = 'flex';
+    if (!list.length) {
+      box.innerHTML = '<div class="poi-empty">暂无搜索结果</div>';
+      return;
+    }
+    box.innerHTML = list.slice(0, 10).map(function (poi, index) {
+      return '<div class="poi-card" data-poi-index="' + index + '">' +
+        '<div class="poi-pin"></div>' +
+        '<div class="poi-card-main">' +
+        '<div class="poi-name">' + escapeHtml(poi.name) + '</div>' +
+        '<div class="poi-address">' + escapeHtml(poi.address || '暂无地址') + '</div>' +
+        '</div>' +
+        '<div class="poi-distance">' + escapeHtml(poi.distance === '' ? '' : String(poi.distance) + 'm') + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  function clearPoiMarkers() {
+    currentPoiMarkers.forEach(function (marker) { if (map && marker) map.remove(marker); });
+    currentPoiMarkers = [];
+  }
+
+  function focusPoi(poi) {
+    if (!map || !poi) return;
+    clearPoiMarkers();
+    var position = new AMap.LngLat(poi.lng, poi.lat);
+    var marker = new AMap.Marker({
+      position: position,
+      title: poi.name,
+      content: '<div class="poi-pin"></div>',
+      offset: new AMap.Pixel(-15, -15),
+      zIndex: 260
+    });
+    map.add(marker);
+    currentPoiMarkers = [marker];
+    map.setCenter(position);
+    map.setZoom(Math.max(map.getZoom(), 16));
+
+    // 第二批修复：点击 POI 后直接写入终点，并收起搜索结果。
+    var endInput = document.getElementById('endPoint');
+    endInput.value = poi.name + (poi.address ? ' · ' + poi.address : '');
+    var resultBox = document.getElementById('poiResults');
+    resultBox.style.display = 'none';
+    resultBox.innerHTML = '';
+    setSheetExpanded(false);
+    showToast('已设为终点：' + poi.name, 'success');
+  }
+
+  function inferPoiKeyword(text) {
+    var t = (text || '').trim();
+    var keywords = ['加油站','充电站','停车场','餐厅','咖啡店','酒店','景点','商场','医院','药店','超市','厕所'];
+    for (var i = 0; i < keywords.length; i++) {
+      if (t.indexOf(keywords[i]) !== -1) return keywords[i];
+    }
+    if (/找|搜索|附近|沿途/.test(t)) {
+      var cleaned = t.replace(/帮我|帮我找|给我|请|找|搜索|附近|沿途|有没有|一个|一些/g, '').trim();
+      if (cleaned) return cleaned;
+    }
+    return '';
+  }
+
+  function handlePoiNaturalLanguage(text) {
+    var keyword = inferPoiKeyword(text);
+    if (!keyword) return false;
+    currentPoiMode = /沿途/.test(text) ? 'along' : (/附近/.test(text) ? 'nearby' : 'keyword');
+    document.querySelectorAll('.poi-mode').forEach(function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-poi-mode') === currentPoiMode);
+    });
+    document.getElementById('poiSearchInput').value = keyword;
+    setSheetExpanded(true);
+    searchPoi(keyword, currentPoiMode);
+    return true;
+  }
+
+  // 第二批：规划成功后统一重置搜索状态，避免旧 POI 结果干扰导航。
+  function resetPoiSearchState() {
+    currentPoiMode = 'keyword';
+    currentPoiResults = [];
+    document.querySelectorAll('.poi-mode').forEach(function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-poi-mode') === 'keyword');
+    });
+    var input = document.getElementById('poiSearchInput');
+    var box = document.getElementById('poiResults');
+    if (input) input.value = '';
+    if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+    clearPoiMarkers();
+  }
+
+  // ============================================================
+  //  6. 清除旧路线
+  // ============================================================
+  function clearRoute() {
+    clearPoiMarkers();
+    routePath = [];
+    traveledPath = [];
+    if (traveledPolyline) { map.remove(traveledPolyline); traveledPolyline = null; }
+    if (currentPolyline) {
+      map.remove(currentPolyline);
+      currentPolyline = null;
+    }
+    currentMarkers.forEach(function (m) { map.remove(m); });
+    currentMarkers = [];
+  }
+
+  // ============================================================
+  //  7. 路线规划——改为调用自己的后端代理接口
+  //  ------------------------------------------------------------
+  //  需求1：不再使用 AMap.Driving / AMap.Geocoder 前端插件直连高德，
+  //  而是把 from/to/tags 一起发给后端，由后端完成地理编码 + 驾车规划，
+  //  前端只负责把返回的 path 画到地图上。
+  //  需求2：tags 会真正影响返回路线（后端按标签选择不同的
+  //  AMap DrivingPolicy），不再只是摆设。
+  // ============================================================
+  async function requestRoutePlan(from, to, tags) {
+    var res = await fetchWithTimeout(API_BASE + '/api/map/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ startPoint: from, endPoint: to, tags: tags })
+    }, 15000);
+    var data = await res.json();
+    if (!res.ok) {
+      throw new Error(data && data.message ? data.message : '路线接口请求失败');
+    }
+    return data;
+  }
+
+  function applyRouteData(data, speak) {
+    var resultBox = document.getElementById('routeResult');
+
+    if (!data || data.success !== true || !Array.isArray(data.path) || data.path.length < 2) {
+      resultBox.style.display = 'block';
+      resultBox.classList.add('error');
+      resultBox.classList.remove('success-badges');
+      resultBox.innerHTML = '<div class="rr-error">⚠️ 后端没有返回可绘制的真实路线轨迹</div>';
+      throw new Error('INVALID_ROUTE_GEOMETRY');
+    }
+
+    routePath = data.path;
+
+    if (currentPolyline) map.remove(currentPolyline);
+    currentPolyline = new AMap.Polyline({
+      path: routePath,
+      strokeColor: currentTheme === 'dark' ? '#0a84ff' : '#007aff',
+      strokeWeight: 7,
+      strokeStyle: 'solid',
+      strokeOpacity: 0.95,
+      lineJoin: 'round',
+      lineCap: 'round',
+      zIndex: 100,
+    });
+    map.add(currentPolyline);
+
+    currentMarkers.forEach(function (m) { map.remove(m); });
+    currentMarkers = [];
+
+    var fromLngLat = data.fromLngLat || routePath[0];
+    var toLngLat = data.toLngLat || routePath[routePath.length - 1];
+
+    var from = document.getElementById('startPoint').value.trim();
+    var to = document.getElementById('endPoint').value.trim();
+
+    var fromMarker = new AMap.Marker({
+      position: fromLngLat,
+      title: '起点',
+      offset: new AMap.Pixel(-12, -36),
+      label: { content: '<span class="ui-icon icon-flag"></span> ' + from, offset: new AMap.Pixel(0, -30) }
+    });
+    var toMarker = new AMap.Marker({
+      position: toLngLat,
+      title: '终点',
+      offset: new AMap.Pixel(-12, -36),
+      label: { content: '<span class="ui-icon icon-target"></span> ' + to, offset: new AMap.Pixel(0, -30) }
+    });
+    map.add(fromMarker);
+    map.add(toMarker);
+    currentMarkers = [fromMarker, toMarker];
+
+    map.resize();
+    if (!liveNavigating) {
+      map.setFitView([currentPolyline, fromMarker, toMarker], false, [140, 40, 260, 40]);
+    }
+
+    var roadNames = (data.steps || []).slice(0, 6).map(function (s) { return s.road; }).filter(Boolean);
+    var duration = data.duration == null ? '--' : data.duration;
+    var distance = data.distance == null ? '--' : data.distance;
+
+    resultBox.style.display = 'block';
+    resultBox.classList.remove('error');
+    resultBox.classList.add('success-badges');
+    var tagsLabel = data.policyUsed || selectedTags.join(' · ') || '默认路线';
+    resultBox.innerHTML =
+      '<div class="rr-badge-plan">推荐</div>' +
+      '<div class="rr-badge-tags">' + escapeHtml(tagsLabel) + '</div>' +
+      '<div class="rr-top">' +
+      '<span class="rr-time">' + escapeHtml(duration) + ' 分钟</span>' +
+      '<span class="rr-dist">约 ' + escapeHtml(distance) + ' 公里</span>' +
+      '</div>' +
+      '<div class="rr-path">途经：' + escapeHtml(roadNames.join(' → ') || '暂无途经道路信息') + '</div>' +
+      '<div class="rr-watermark">高德地图</div>';
+
+    // 结果出来了，把收起态的卡片自动展开，不然用户看不到
+    setSheetExpanded(true);
+
+    currentRouteData = {
+      from: from,
+      to: to,
+      duration: data.duration,
+      distance: data.distance,
+      tags: selectedTags.slice(),
+      time: new Date().toLocaleString(),
+      routeId: data.routeId || ('route_' + Date.now()),
+      fromLngLat: Array.isArray(fromLngLat) ? fromLngLat : [fromLngLat.getLng(), fromLngLat.getLat()],
+      endLngLat: Array.isArray(toLngLat) ? toLngLat : [toLngLat.getLng(), toLngLat.getLat()]
+    };
+
+    resetPoiSearchState();
+    if (navigationState !== 'navigating' && navigationState !== 'rerouting' && navigationState !== 'offRoute') {
+      setNavigationState('idle', '路线规划完成');
+    }
+    persistRouteForNavigation();
+    if (speak) speakRouteInfo(from, to, distance, duration);
+  }
+
+  // planRoute 现在接收一个 options 对象：
+  //   { speak: true/false }  —— 是否允许规划成功后语音播报
+  async function planRoute(options) {
+    options = options || {};
+    var speak = options.speak !== false;
+
+    // 需求11：起点/终点为空时提示，不再静默兜底成"北京→西安"
+    var from = document.getElementById('startPoint').value.trim();
+    var to = document.getElementById('endPoint').value.trim();
+
+    if (!from || !to) {
+      showToast('⚠️ 请先填写起点和终点', 'error');
+      return;
+    }
+    // 需求10：起点和终点相同时提示错误
+    if (from === to) {
+      showToast('⚠️ 起点和终点不能相同', 'error');
+      return;
+    }
+
+    if (!map) {
+      showToast('正在地图正在加载，请稍候…');
+      return;
+    }
+
+    // 需求5：规划请求进行中时拦截重复触发（重复点击/连续回车/AI自动触发撞车）
+    if (isPlanning) {
+      showToast('正在上一次规划还在进行中，请稍候…');
+      return;
+    }
+    isPlanning = true;
+
+    setAiState('thinking');
+    showToast('正在正在规划路线…');
+    if (liveNavigating) stopNavigation();
+    setNavigationState('planning', '正在规划路线…');
+    clearRoute();
+
+    try {
+      var data = await requestRoutePlan(from, to, selectedTags);
+      setAiState('idle');
+      applyRouteData(data, speak);
+      showToast('路线：路线规划成功', 'success');
+    } catch (err) {
+      setAiState('idle');
+      var resultBox = document.getElementById('routeResult');
+      resultBox.style.display = 'block';
+      resultBox.classList.add('error');
+      resultBox.classList.remove('success-badges');
+      var msg = '路线规划失败，请检查起终点或稍后重试';
+      if (err && err.name === 'AbortError') {
+        msg = '请求超时，请检查网络或稍后重试';
+      } else if (err && err.message && err.message !== 'INVALID_ROUTE_GEOMETRY') {
+        msg = err.message;
+      }
+      resultBox.innerHTML = '<div class="rr-error">⚠️ ' + escapeHtml(msg) + '</div>';
+      showToast('❌ 路线规划失败', 'error');
+      setSheetExpanded(true);
+    } finally {
+      isPlanning = false;
+      if (navigationState === 'planning') setNavigationState('idle', '路线规划结束');
+    }
+  }
+
+  // ============================================================
+  //  8. 标签逻辑
+  //  ------------------------------------------------------------
+  //  需求2：selectedTags 会被送到后端参与真实的路线策略选择，
+  //  具体的"标签 → AMap DrivingPolicy"映射表在后端实现（见 backend-api.md）。
+  // ============================================================
+  function updateTagSelection() {
+    var activeTags = [];
+    document.querySelectorAll('.tag-btn').forEach(function (btn) {
+      if (btn.classList.contains('active')) {
+        activeTags.push(btn.getAttribute('data-tag'));
+      }
+    });
+    selectedTags = activeTags;
+  }
+
+  document.querySelectorAll('.tag-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      this.classList.toggle('active');
+      updateTagSelection();
+    });
+  });
+
+  // 供 AI 意图识别结果调用：把后端识别出的偏好标签同步到界面按钮上
+  function applyTagsFromAI(tags) {
+    if (!tags || !tags.length) return;
+    document.querySelectorAll('.tag-btn').forEach(function (btn) {
+      var tag = btn.getAttribute('data-tag');
+      if (tags.indexOf(tag) !== -1) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    updateTagSelection();
+  }
+
+  // ============================================================
+  //  9. 保存路线到历史（新增唯一 id，配合需求5单条删除）
+  // ============================================================
+  function saveRouteToHistory() {
+    if (!currentRouteData) {
+      showToast('请先规划一条路线再保存', 'error');
+      return;
+    }
+    var exists = routeHistory.some(function (item) {
+      return item.from === currentRouteData.from &&
+        item.to === currentRouteData.to &&
+        item.duration === currentRouteData.duration;
+    });
+    if (exists) {
+      showToast('这条路线已经保存过了', 'error');
+      return;
+    }
+    routeHistory.push({
+      id: Date.now() + '_' + Math.random().toString(36).slice(2, 8), // 唯一id，用于单条删除
+      from: currentRouteData.from,
+      to: currentRouteData.to,
+      duration: currentRouteData.duration,
+      distance: currentRouteData.distance,
+      tags: currentRouteData.tags.slice(),
+      time: currentRouteData.time
+    });
+    localStorage.setItem('routeHistory', JSON.stringify(routeHistory));
+    renderHistory();
+    showToast('✅ 已保存到路线库', 'success');
+  }
+
+  // ============================================================
+  //  10. 渲染历史（需求5：每条记录带 ✕ 删除按钮）
+  // ============================================================
+  function renderHistory() {
+    var panel = document.getElementById('historyList');
+    if (!panel) return;
+    if (routeHistory.length === 0) {
+      panel.innerHTML = '<div class="history-empty">暂无保存的路线</div>';
+      return;
+    }
+    var html = '';
+    routeHistory.slice().reverse().forEach(function (item) {
+      html += '<div class="history-item">' +
+        '<div class="hi-row">' +
+        '<div class="hi-route">' + escapeHtml(item.from) + ' → ' + escapeHtml(item.to) + '</div>' +
+        '<button class="hi-delete" data-history-id="' + escapeHtml(item.id) + '" title="删除">✕</button>' +
+        '</div>' +
+        '<div class="hi-meta">' + escapeHtml(item.duration) + ' 分钟 · ' + escapeHtml(item.distance) + ' km · ' + escapeHtml(item.time) + '</div>' +
+        '<div class="hi-tags"><span class="ui-icon icon-tag"></span> ' + escapeHtml(item.tags.join(' · ') || '无标签') + '</div>' +
+        '</div>';
+    });
+    panel.innerHTML = html;
+  }
+
+  // 需求5：从 localStorage 和界面中移除单条历史记录
+  function deleteHistoryItem(id) {
+    routeHistory = routeHistory.filter(function (item) { return item.id !== id; });
+    localStorage.setItem('routeHistory', JSON.stringify(routeHistory));
+    renderHistory();
+    showToast('<span class="ui-icon icon-trash"></span>️ 已删除该条路线', 'success');
+  }
+
+  // 需求8：清空全部历史，带 confirm() 二次确认，避免误触全部清空
+  function clearAllHistory() {
+    if (!routeHistory.length) {
+      showToast('还没有保存的路线', 'error');
+      return;
+    }
+    if (!confirm('确定要清空全部历史路线吗？此操作无法恢复。')) return;
+    routeHistory = [];
+    localStorage.setItem('routeHistory', JSON.stringify(routeHistory));
+    renderHistory();
+    showToast('<span class="ui-icon icon-trash"></span>️ 已清空全部历史', 'success');
+  }
+
+  // 用事件委托代替内联 onclick 字符串拼接：删除按钮的 id 通过 data-history-id
+  // 属性传递，点击时从事件里读取，不再把用户数据拼进可执行的 onclick 属性里，
+  // 从根上避免"字符串拼 HTML 属性"这类注入风险。
+  document.getElementById('historyList').addEventListener('click', function (e) {
+    var btn = e.target.closest('.hi-delete');
+    if (!btn) return;
+    var id = btn.getAttribute('data-history-id');
+    if (id) deleteHistoryItem(id);
+  });
+
+  // ============================================================
+  //  11. 历史抽屉开关
+  // ============================================================
+  function toggleHistory(forceOpen) {
+    var panel = document.getElementById('historyPanel');
+    var mask = document.getElementById('drawerMask');
+    var willOpen = typeof forceOpen === 'boolean' ? forceOpen : !panel.classList.contains('open');
+    if (willOpen) {
+      renderHistory();
+      panel.classList.add('open');
+      mask.classList.add('show');
+    } else {
+      panel.classList.remove('open');
+      mask.classList.remove('show');
+    }
+  }
+
+  // ============================================================
+  //  12. AI 意图识别（需求3：现在同时识别起终点 + 偏好标签）
+  //  ------------------------------------------------------------
+  //  前端只负责：把用户输入发给后端 → 拿到 {startPoint, endPoint, tags}
+  //  → 回填输入框 + 勾选对应标签 → 触发一次静音的路线规划。
+  //  真正的关键词→标签映射逻辑在后端实现，见 backend-api.md。
+  // ============================================================
+  function hasExplicitRouteIntent(text) {
+    var t = (text || '').trim();
+    // 第二批修复：只有出现明确的起点/终点关系时，AI 路线规划才优先。
+    return /从.+到.+/.test(t) || /起点.+终点/.test(t) || /从.+去.+/.test(t) || /由.+前往.+/.test(t);
+  }
+
+  async function aiChat(text) {
+    if (!text) return;
+
+    // 第二批修复：明确起终点 -> 先走 AI 意图识别；否则再交给 POI 搜索。
+    if (!hasExplicitRouteIntent(text) && handlePoiNaturalLanguage(text)) {
+      showToast('正在为你搜索相关地点…');
+      return;
+    }
+
+    setAiState('thinking');
+    showToast('<span class="ui-icon icon-ai"></span> 耀宝正在理解你的意思…');
+    try {
+      var response = await fetchWithTimeout(API_BASE + '/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text })
+      }, 15000);
+      var data = await response.json();
+      setAiState('idle');
+
+      if (data.success && data.intent) {
+        var intent = data.intent;
+        if (intent.startPoint) document.getElementById('startPoint').value = intent.startPoint;
+        if (intent.endPoint) document.getElementById('endPoint').value = intent.endPoint;
+        if (intent.preferenceTags && intent.preferenceTags.length) applyTagsFromAI(intent.preferenceTags);
+
+        if (intent.startPoint && intent.endPoint) {
+          showToast('<span class="ui-icon icon-ai"></span> 识别成功，自动开始规划…', 'success');
+          setTimeout(function () { planRoute({ speak: false }); }, 500);
+        } else if (handlePoiNaturalLanguage(text)) {
+          showToast('正在为你搜索相关地点…');
+        } else {
+          showToast('✅ AI 已连接，但没识别出完整的起终点', 'success');
+        }
+      } else if (handlePoiNaturalLanguage(text)) {
+        showToast('正在为你搜索相关地点…');
+      } else {
+        showToast('<span class="ui-icon icon-ai"></span> 没太明白，可以再说具体一点吗？');
+      }
+    } catch (error) {
+      setAiState('idle');
+      // AI 失败时，如果原话明显是搜索需求，仍然尝试走 POI。
+      if (handlePoiNaturalLanguage(text)) {
+        showToast('AI 暂时不可用，已切换为地点搜索');
+        return;
+      }
+      if (error && error.name === 'AbortError') {
+        showToast('⏱️ AI 响应超时，请稍后重试', 'error');
+      } else {
+        showToast('❌ 连不上后端，请确认 /api/ai/chat 接口已实现', 'error');
+      }
+    }
+  }
+
+  // ============================================================
+  //  12.5 安全访问检测（需求7）
+  //  ------------------------------------------------------------
+  //  非 localhost 的 HTTP 环境下，浏览器地理定位/摄像头等能力会被
+  //  限制甚至直接拒绝，提前用 Toast 提示，避免用户以为是代码坏了。
+  // ============================================================
+  function checkSecureContext() {
+    var isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (isNativeAppContainer()) return;
+    if (location.protocol === 'http:' && !isLocalhost) {
+      showToast('⚠️ 请使用 HTTPS 访问，网页定位能力受浏览器安全策略限制', 'error');
+    }
+  }
+
+  // ============================================================
+  //  13. 事件绑定 & 启动
+  //  ------------------------------------------------------------
+  //  需求6：只有这里——真正由用户点击 / 回车触发的调用——才传 speak:true
+  // ============================================================
+  document.getElementById('planBtn').addEventListener('click', function () {
+    planRoute({ speak: true });
+  });
+  document.getElementById('historyToggleBtn').addEventListener('click', function () { toggleHistory(); });
+  document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
+  document.getElementById('sheetHandle').addEventListener('click', toggleSheet);
+  document.getElementById('aiInput').addEventListener('focus', function () { setSheetExpanded(true); });
+  document.getElementById('closeHistoryBtn').addEventListener('click', function () { toggleHistory(false); });
+  document.getElementById('clearHistoryBtn').addEventListener('click', clearAllHistory);
+  document.getElementById('drawerMask').addEventListener('click', function () { toggleHistory(false); });
+  document.getElementById('saveRouteBtn').addEventListener('click', saveRouteToHistory);
+  document.getElementById('locateBtn').addEventListener('click', function () { doLocate(false); });
+  document.getElementById('navBtn').addEventListener('click', toggleNavigation);
+  document.getElementById('swapBtn').addEventListener('click', function () {
+    var s = document.getElementById('startPoint');
+    var e = document.getElementById('endPoint');
+    var tmp = s.value;
+    s.value = e.value;
+    e.value = tmp;
+  });
+
+  // 需求4：只要是用户手动敲的（input事件），就记下来，
+  // 和"定位失败后回填"的赋值（直接改 .value，不触发input事件）区分开
+  document.getElementById('startPoint').addEventListener('input', function () {
+    lastManualStartPoint = this.value;
+  });
+  document.getElementById('startPoint').addEventListener('keyup', function (e) {
+    if (e.key === 'Enter') planRoute({ speak: true });
+  });
+  document.getElementById('endPoint').addEventListener('keyup', function (e) {
+    if (e.key === 'Enter') planRoute({ speak: true });
+  });
+
+  document.getElementById('aiSendBtn').addEventListener('click', function () {
+    var input = document.getElementById('aiInput');
+    var text = input.value.trim();
+    if (!text) return;
+    aiChat(text);
+    input.value = '';
+  });
+  document.getElementById('aiInput').addEventListener('keyup', function (e) {
+    if (e.key === 'Enter') {
+      var text = this.value.trim();
+      if (!text) return;
+      aiChat(text);
+      this.value = '';
+    }
+  });
+
+  // 第一批：搜索事件绑定
+  document.querySelectorAll('.poi-mode').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      currentPoiMode = this.getAttribute('data-poi-mode') || 'keyword';
+      document.querySelectorAll('.poi-mode').forEach(function (b) { b.classList.remove('active'); });
+      this.classList.add('active');
+    });
+  });
+  document.getElementById('poiSearchBtn').addEventListener('click', function () {
+    searchPoi(document.getElementById('poiSearchInput').value, currentPoiMode);
+  });
+  document.getElementById('poiSearchInput').addEventListener('keyup', function (e) {
+    if (e.key === 'Enter') searchPoi(this.value, currentPoiMode);
+  });
+  document.getElementById('poiResults').addEventListener('click', function (e) {
+    var card = e.target.closest('.poi-card');
+    if (!card) return;
+    var index = Number(card.getAttribute('data-poi-index'));
+    if (currentPoiResults[index]) focusPoi(currentPoiResults[index]);
+  });
+
+  // ============================================================
+  // 第三批：耀宝智能控制层
+  // ------------------------------------------------------------
+  // AI 不直接计算地图路线；它负责理解用户意图，再调用现有搜索/规划能力。
+  // ============================================================
+  function extractNavigationPreference(text) {
+    var t = (text || '').trim();
+    var rules = [
+      { re: /不要.*高速|不走高速|避开高速/, tag: '高速少' },
+      { re: /多.*高速|优先高速|走高速/, tag: '高速多' },
+      { re: /少.*红绿灯|避开红绿灯/, tag: '红绿灯少' },
+      { re: /风景|好看|景色/, tag: '风景好' },
+      { re: /新手|容易开/, tag: '新手友好' }
+    ];
+    for (var i=0;i<rules.length;i++) if (rules[i].re.test(t)) return rules[i].tag;
+    return '';
+  }
+
+  function applyNaturalNavigationPreference(text) {
+    var tag = extractNavigationPreference(text);
+    if (!tag) return false;
+    applyTagsFromAI([tag]);
+    showToast('耀宝已调整路线偏好：' + tag, 'success');
+    if (routePath.length && document.getElementById('startPoint').value.trim() && document.getElementById('endPoint').value.trim()) {
+      setTimeout(function(){ planRoute({speak:false}); }, 150);
+    }
+    return true;
+  }
+
+  // 第五批：地点记忆，使用 localStorage 保存家/公司/收藏地点。
+  var placeMemory = JSON.parse(localStorage.getItem('yaowangPlaceMemory') || '{}');
+  var favoritePlaces = JSON.parse(localStorage.getItem('yaowangFavoritePlaces') || '[]');
+
+  function savePlaceMemory(type, value) {
+    value = (value || '').trim();
+    if (!value) return;
+    if (type === 'favorite') {
+      if (!favoritePlaces.some(function(x){return x.name === value;})) favoritePlaces.push({name:value, time:Date.now()});
+      localStorage.setItem('yaowangFavoritePlaces', JSON.stringify(favoritePlaces));
+    } else {
+      placeMemory[type] = value;
+      localStorage.setItem('yaowangPlaceMemory', JSON.stringify(placeMemory));
+    }
+  }
+
+  function usePlaceMemory(type) {
+    if (type === 'favorite') {
+      if (!favoritePlaces.length) { showToast('还没有收藏地点'); return; }
+      var names = favoritePlaces.slice(-5).map(function(x){return x.name;});
+      document.getElementById('endPoint').value = names[names.length - 1];
+      showToast('已使用最近收藏地点：' + names[names.length - 1], 'success');
+      return;
+    }
+    if (!placeMemory[type]) { showToast(type === 'home' ? '还没有保存“家”' : '还没有保存“公司”'); return; }
+    document.getElementById('endPoint').value = placeMemory[type];
+    showToast('已填入：' + placeMemory[type], 'success');
+  }
+
+  function enhanceMemoryFromRoute() {
+    if (!currentRouteData) return;
+    // 只有用户明确要求时才保存，避免未经同意记录地点。
+    var to = currentRouteData.to || '';
+    if (/^(家|回家)$/.test(to)) savePlaceMemory('home', to);
+    if (/^(公司|上班)$/.test(to)) savePlaceMemory('work', to);
+  }
+
+  document.querySelectorAll('.memory-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){ usePlaceMemory(this.getAttribute('data-memory')); });
+  });
+
+  // 让“家/公司/收藏”可以被耀宝直接理解。
+  function resolveMemoryAlias(text) {
+    var t = (text || '').trim();
+    if (/回家|去家里/.test(t) && placeMemory.home) return placeMemory.home;
+    if (/去公司|去上班/.test(t) && placeMemory.work) return placeMemory.work;
+    return '';
+  }
+
+  // 第四批：增强导航状态展示和路线信息，保持基础地图导航与 AI 解耦。
+  function updateNavigationMetrics() {
+    var result = document.getElementById('routeResult');
+    if (!result || !currentRouteData) return;
+    var metric = result.querySelector('.nav-metric');
+    if (!metric) {
+      metric = document.createElement('div');
+      metric.className = 'nav-metric';
+      result.appendChild(metric);
+    }
+    metric.innerHTML = '<span>状态：' + escapeHtml(navigationState) + '</span><span>实时追踪：' + (liveNavigating ? '开启' : '未开启') + '</span>';
+  }
+
+  var _setNavigationState = setNavigationState;
+  setNavigationState = function(nextState, reason) {
+    _setNavigationState(nextState, reason);
+    updateNavigationMetrics();
+  };
+
+  // 第五批：保存路线成功后保留最近一次目的地记忆。
+  var _applyRouteData = applyRouteData;
+  applyRouteData = function(data, speak) {
+    var result = _applyRouteData(data, speak);
+    enhanceMemoryFromRoute();
+    updateNavigationMetrics();
+    return result;
+  };
+
+  // 第三批：重写 AI 入口，优先处理明确路线，其次处理导航偏好，再处理 POI。
+  var _aiChat = aiChat;
+  aiChat = async function(text) {
+    text = (text || '').trim();
+    if (!text) return;
+
+    var alias = resolveMemoryAlias(text);
+    if (alias) {
+      document.getElementById('endPoint').value = alias;
+      if (document.getElementById('startPoint').value.trim()) {
+        await planRoute({speak:false});
+        return;
+      }
+    }
+
+    // 明确的起终点始终优先路线规划，避免“找加油站”等关键词抢走意图。
+    if (hasExplicitRouteIntent(text)) {
+      return _aiChat(text);
+    }
+
+    if (applyNaturalNavigationPreference(text)) return;
+    return _aiChat(text);
+  };
+
+  // 第四批：真实 GPS 更新时同步导航指标。
+  var _onLiveLocation = onLiveLocation;
+  onLiveLocation = function(status, result) {
+    _onLiveLocation(status, result);
+    updateNavigationMetrics();
+  };
+
+
+  // ============================================================
+  // 新增模块一：自适应环境语音输入
+  // ------------------------------------------------------------
+  // 实体硬件环境：调用耀宝本体的 POST /command，由 Python VoiceEngine
+  // 完成本地录音与 Vosk 识别。
+  // 普通网页环境：恢复浏览器 Web Speech API，不依赖本地 3900 服务。
+  // 两种环境最终都继续沿用原有 aiInput → aiChat 业务链，不改变上层意图处理。
+  // ============================================================
+  (function initVoiceInput() {
+    var voiceBtn = document.getElementById('voiceInputBtn');
+    if (!voiceBtn) return;
+
+    // ============================================================
+    // 普通网页环境：浏览器 Web Speech API 语音识别适配层
+    // ------------------------------------------------------------
+    // 新增：把原先的浏览器语音识别逻辑放回这里，仅在公网/普通网页环境启用。
+    // ============================================================
+    function createWebSpeechVoiceProvider() {
+      var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) return null;
+
+      var recognition = new SpeechRecognition();
+      recognition.lang = 'zh-CN';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      return {
+        start: function (handlers) {
+          handlers = handlers || {};
+          recognition.onresult = handlers.onresult || null;
+          recognition.onend = handlers.onend || null;
+          recognition.onerror = handlers.onerror || null;
+          recognition.start();
+        },
+        stop: function () {
+          try { recognition.stop(); } catch (e) {}
+        }
+      };
+    }
+
+    if (!DEVICE_ENV_IS_HARDWARE) {
+      var webSpeechProvider = createWebSpeechVoiceProvider();
+      if (!webSpeechProvider) {
+        // 普通网页环境下若浏览器不支持 Web Speech API，沿用原有行为隐藏话筒按钮。
+        voiceBtn.style.display = 'none';
+        return;
+      }
+
+      var webVoiceTimer = null;
+      var webRecording = false;
+
+      function stopWebVoiceUI() {
+        webRecording = false;
+        voiceBtn.classList.remove('recording');
+        voiceBtn.disabled = false;
+        clearTimeout(webVoiceTimer);
+        webVoiceTimer = null;
+      }
+
+      voiceBtn.addEventListener('click', function () {
+        if (webRecording) {
+          webSpeechProvider.stop();
+          stopWebVoiceUI();
+          return;
+        }
+
+        webRecording = true;
+        voiceBtn.disabled = false;
+        voiceBtn.classList.add('recording');
+        showToast('正在听你说…');
+
+        webVoiceTimer = setTimeout(function () {
+          if (!webRecording) return;
+          webSpeechProvider.stop();
+          stopWebVoiceUI();
+          showToast('语音输入已停止');
+        }, 10000);
+
+        try {
+          webSpeechProvider.start({
+            onresult: function (event) {
+              var text = '';
+              for (var i = event.resultIndex; i < event.results.length; i++) {
+                text += event.results[i][0].transcript;
+              }
+              text = text.trim();
+              if (!text) return;
+
+              var input = document.getElementById('aiInput');
+              input.value = text;
+              setSheetExpanded(true);
+              // 识别结果继续进入现有 AI 意图处理链。
+              aiChat(text);
+              input.value = '';
+            },
+            onend: function () {
+              stopWebVoiceUI();
+            },
+            onerror: function (event) {
+              stopWebVoiceUI();
+              if (event && event.error === 'not-allowed') {
+                showToast('麦克风权限被拒绝', 'error');
+              } else if (event && event.error !== 'aborted') {
+                showToast('语音识别失败，请重试', 'error');
+              }
+            }
+          });
+        } catch (err) {
+          stopWebVoiceUI();
+          showToast('无法启动语音输入，请检查麦克风权限', 'error');
+        }
+      });
+      return;
+    }
+
+    // ============================================================
+    // 实体硬件环境：调用本地 Python VoiceEngine
+    // ------------------------------------------------------------
+    // 设备无浏览器语音识别能力，因此点击后调用耀宝本体的
+    // POST /command {type:"voice"}，由 Python VoiceEngine.listen_once
+    // 完成一次最多 10 秒的本地录音与 Vosk 识别。
+    // ============================================================
+    var recording = false;
+    var voiceTimer = null;
+
+    function stopVoiceUI() {
+      recording = false;
+      voiceBtn.classList.remove('recording');
+      voiceBtn.disabled = false;
+      clearTimeout(voiceTimer);
+      voiceTimer = null;
+    }
+
+    voiceBtn.addEventListener('click', async function () {
+      if (recording) return;
+
+      recording = true;
+      voiceBtn.disabled = true;
+      voiceBtn.classList.add('recording');
+      showToast('正在听你说…');
+
+      voiceTimer = setTimeout(function () {
+        if (recording) showToast('语音采集已达到 10 秒上限');
+      }, 10000);
+
+      try {
+        var response = await fetchWithTimeout(DEVICE_STATUS_BASE + '/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'voice', seconds: 10 })
+        }, 12000);
+
+        var data = await response.json();
+        stopVoiceUI();
+
+        if (!response.ok || !data.success) {
+          showToast('语音识别失败，请检查耀宝麦克风与本地语音模型', 'error');
+          return;
+        }
+
+        var text = (data.text || '').trim();
+        if (!text) {
+          showToast('没有听清，再说一次吧', 'error');
+          return;
+        }
+
+        var input = document.getElementById('aiInput');
+        input.value = text;
+        setSheetExpanded(true);
+        // 识别结果继续进入现有 AI 意图处理链。
+        aiChat(text);
+        input.value = '';
+      } catch (error) {
+        stopVoiceUI();
+        if (error && error.name === 'AbortError') {
+          showToast('语音采集超时，请检查本地语音服务', 'error');
+        } else {
+          showToast('无法连接耀宝本地语音服务，请确认 3900 服务已启动', 'error');
+        }
+      }
+    });
+  })();
+
+  startDeviceStatusPolling();
+
+  // ============================================================
+  // 新增模块二：三路线方案对比
+  // ------------------------------------------------------------
+  // USE_MOCK_ROUTES=true 时，即使后端仍返回单路线，也会在前端生成三种策略。
+  // 后端以后返回 routes 数组时，自动优先使用真实 routes。
+  // ============================================================
+  var USE_MOCK_ROUTES = true;
+  var routeOptions = [];
+  var selectedRouteIndex = 0;
+
+  function normalizeRouteOption(item, index) {
+    item = item || {};
+    var tags = Array.isArray(item.tags) ? item.tags : (item.tags ? [item.tags] : []);
+    return {
+      planName: item.planName || item.name || ['推荐路线', '省时路线', '舒适路线'][index] || ('方案 ' + (index + 1)),
+      tags: tags,
+      duration: item.duration == null ? '--' : item.duration,
+      distance: item.distance == null ? '--' : item.distance,
+      path: Array.isArray(item.path) ? item.path : [],
+      redLightCount: item.redLightCount == null ? '--' : item.redLightCount,
+      tollFee: item.tollFee == null ? 0 : item.tollFee,
+      routeId: item.routeId || ('route_option_' + index + '_' + Date.now())
+    };
+  }
+
+  function buildMockRoutes(base) {
+    var basePath = Array.isArray(base.path) ? base.path : [];
+    var duration = Number(base.duration);
+    var distance = Number(base.distance);
+    return [
+      normalizeRouteOption({
+        planName: '智能推荐', tags: ['综合最优'], duration: Number.isFinite(duration) ? duration : base.duration,
+        distance: Number.isFinite(distance) ? distance : base.distance, path: basePath,
+        redLightCount: base.redLightCount == null ? 6 : base.redLightCount, tollFee: base.tollFee == null ? 0 : base.tollFee,
+        routeId: (base.routeId || 'route') + '_0'
+      }, 0),
+      normalizeRouteOption({
+        planName: '省时优先', tags: ['时间最短', '高速优先'],
+        duration: Number.isFinite(duration) ? Math.max(1, Math.round(duration * 0.88)) : '--',
+        distance: Number.isFinite(distance) ? (distance * 1.04).toFixed(1) : base.distance, path: basePath,
+        redLightCount: base.redLightCount == null ? 8 : Math.max(0, Number(base.redLightCount) + 2), tollFee: base.tollFee == null ? 15 : Number(base.tollFee) + 15,
+        routeId: (base.routeId || 'route') + '_1'
+      }, 1),
+      normalizeRouteOption({
+        planName: '舒适优先', tags: ['少红绿灯', '少收费'],
+        duration: Number.isFinite(duration) ? Math.max(1, Math.round(duration * 1.08)) : '--',
+        distance: Number.isFinite(distance) ? (distance * 0.98).toFixed(1) : base.distance, path: basePath,
+        redLightCount: base.redLightCount == null ? 3 : Math.max(0, Number(base.redLightCount) - 3), tollFee: 0,
+        routeId: (base.routeId || 'route') + '_2'
+      }, 2)
+    ];
+  }
+
+  function renderRouteOptions() {
+    var box = document.getElementById('routeOptions');
+    if (!box || !routeOptions.length) return;
+    box.style.display = 'flex';
+    box.innerHTML = routeOptions.map(function (r, index) {
+      var tags = r.tags.map(function (t) { return '<span class="route-option-tag">' + escapeHtml(t) + '</span>'; }).join('');
+      return '<button type="button" class="route-option-card ' + (index === selectedRouteIndex ? 'selected' : '') + '" data-route-index="' + index + '">' +
+        '<div class="route-option-top"><span class="route-option-name">' + escapeHtml(r.planName) + '</span>' +
+        (index === 0 ? '<span class="route-option-recommend">推荐</span>' : '') + '</div>' +
+        '<div class="route-option-metrics"><span class="route-option-time">' + escapeHtml(r.duration) + ' 分钟</span><span class="route-option-distance">约 ' + escapeHtml(r.distance) + ' 公里</span></div>' +
+        '<div class="route-option-meta">' + tags + '<span class="route-option-tag">红绿灯 ' + escapeHtml(r.redLightCount) + '</span><span class="route-option-tag">收费 ¥' + escapeHtml(r.tollFee) + '</span></div>' +
+        '<div class="route-option-path">点击切换路线，地图将同步显示该方案</div>' +
+        '</button>';
+    }).join('');
+  }
+
+  function drawSelectedRouteOption(index, shouldFit) {
+    var option = routeOptions[index];
+    if (!option || !map) return;
+    selectedRouteIndex = index;
+    var path = option.path;
+    if (Array.isArray(path) && path.length >= 2) {
+      routePath = path;
+      if (currentPolyline) map.remove(currentPolyline);
+      currentPolyline = new AMap.Polyline({ path: path, strokeColor: currentTheme === 'dark' ? '#0a84ff' : '#007aff', strokeWeight: 7, strokeStyle: 'solid', strokeOpacity: .95, lineJoin: 'round', lineCap: 'round', zIndex: 100 });
+      map.add(currentPolyline);
+      if (shouldFit && !liveNavigating) map.setFitView([currentPolyline].concat(currentMarkers || []), false, [140, 40, 260, 40]);
+    }
+    if (currentRouteData) {
+      currentRouteData.duration = option.duration;
+      currentRouteData.distance = option.distance;
+      currentRouteData.routeId = option.routeId;
+      currentRouteData.tags = option.tags.slice();
+      currentRouteData.redLightCount = option.redLightCount;
+      currentRouteData.tollFee = option.tollFee;
+      currentRouteData.endLngLat = currentRouteData.endLngLat;
+      persistRouteForNavigation();
+    }
+    renderRouteOptions();
+  }
+
+  // 新增：兼容真实 routes 数组和旧版单路线响应。
+  var _requestRoutePlanForMulti = requestRoutePlan;
+  requestRoutePlan = async function(from, to, tags) {
+    var data = await _requestRoutePlanForMulti(from, to, tags);
+    if (data && Array.isArray(data.routes) && data.routes.length) {
+      data.routes = data.routes.slice(0, 3).map(normalizeRouteOption);
+    } else if (USE_MOCK_ROUTES && data) {
+      data.routes = buildMockRoutes(data);
+    }
+    return data;
+  };
+
+  // 新增：在原有路线绘制完成后建立三方案卡片，并默认选择推荐方案。
+  var _applyRouteDataForMulti = applyRouteData;
+  applyRouteData = function(data, speak) {
+    var result = _applyRouteDataForMulti(data, speak);
+    routeOptions = Array.isArray(data.routes) ? data.routes.slice(0, 3) : [];
+    if (routeOptions.length) {
+      selectedRouteIndex = 0;
+      // 首张卡片复用原接口返回的真实轨迹；后端暂未实现多路线时 mock 三张策略卡。
+      routeOptions[0].path = routeOptions[0].path.length ? routeOptions[0].path : routePath.slice();
+      drawSelectedRouteOption(0, false);
+      renderRouteOptions();
+    }
+    return result;
+  };
+
+  // 新增：三路线卡片点击事件，切换时同步地图路线。
+  document.getElementById('routeOptions').addEventListener('click', function (e) {
+    var card = e.target.closest('.route-option-card');
+    if (!card) return;
+    var index = Number(card.getAttribute('data-route-index'));
+    if (!Number.isInteger(index) || !routeOptions[index]) return;
+    drawSelectedRouteOption(index, true);
+    showToast('已切换：' + routeOptions[index].planName, 'success');
+  });
+
+  window.onload = function () {
+    checkSecureContext();
+    loadMapConfigAndInit();
+    renderHistory();
+    updateTagSelection();
+  };
+
+  // 暴露全局（给可能的内联调用）
+  window.planRoute = planRoute;
+  window.toggleHistory = toggleHistory;
+  window.saveRouteToHistory = saveRouteToHistory;
+  window.aiChat = aiChat;
+  window.searchPoi = searchPoi;
+
+  console.log('✅ 遥望·耀宝 AI 导航系统已加载（搜索 + 状态机 + 实时追踪版）');
+</script>
+
+</body>
+</html>

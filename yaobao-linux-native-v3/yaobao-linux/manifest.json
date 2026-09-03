@@ -1,0 +1,25 @@
+{
+  "name": "yaobao-linux-native",
+  "version": "1.1.0",
+  "runtime": "Linux",
+  "components": [
+    "GT-U7 NMEA GPS",
+    "Vosk offline STT adapter",
+    "Piper offline TTS adapter",
+    "HTTP retry + offline route cache",
+    "Python resident service",
+    "pygame small-screen renderer",
+    "navigation state machine"
+  ],
+  "business_endpoints": [
+    "/api/map/route",
+    "/api/map/poi",
+    "/api/ai/chat"
+  ],
+  "features": [
+    "bluetooth_speaker",
+    "a2dp_sink",
+    "avrcp",
+    "audio_ducking"
+  ]
+}

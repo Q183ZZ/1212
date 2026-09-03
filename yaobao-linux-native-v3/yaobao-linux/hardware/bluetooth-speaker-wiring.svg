@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+  <rect width="1400" height="900" fill="#f6f6f6"/>
+  <text x="70" y="70" font-family="Arial, sans-serif" font-size="34" font-weight="700">遥望·耀宝 V1.1 Bluetooth 音箱连接线路</text>
+  <text x="70" y="110" font-family="Arial, sans-serif" font-size="20">实体导航 + AI语音 + 双扬声器 Bluetooth A2DP 音箱</text>
+
+  <rect x="80" y="190" width="300" height="190" rx="24" fill="white" stroke="#222" stroke-width="3"/>
+  <text x="110" y="235" font-family="Arial" font-size="25" font-weight="700">手机 / 平板</text>
+  <text x="110" y="275" font-family="Arial" font-size="20">Bluetooth A2DP</text>
+  <text x="110" y="310" font-family="Arial" font-size="20">AVRCP 播放控制</text>
+  <text x="110" y="345" font-family="Arial" font-size="17">无需耀宝 App</text>
+
+  <rect x="500" y="160" width="380" height="260" rx="24" fill="white" stroke="#222" stroke-width="3"/>
+  <text x="530" y="210" font-family="Arial" font-size="25" font-weight="700">Orange Pi Zero</text>
+  <text x="530" y="250" font-family="Arial" font-size="20">Linux + BlueZ</text>
+  <text x="530" y="285" font-family="Arial" font-size="20">PipeWire / PulseAudio</text>
+  <text x="530" y="320" font-family="Arial" font-size="20">AI / TTS / 导航播报</text>
+  <text x="530" y="355" font-family="Arial" font-size="17">板载 Bluetooth 优先</text>
+  <text x="530" y="385" font-family="Arial" font-size="17">无板载 BT → USB BT 5.x</text>
+
+  <rect x="1000" y="180" width="300" height="180" rx="24" fill="white" stroke="#222" stroke-width="3"/>
+  <text x="1030" y="230" font-family="Arial" font-size="25" font-weight="700">Class-D 功放</text>
+  <text x="1030" y="270" font-family="Arial" font-size="20">双声道 L / R</text>
+  <text x="1030" y="310" font-family="Arial" font-size="20">建议 2×2W～5W</text>
+  <text x="1030" y="340" font-family="Arial" font-size="16">独立电源输入</text>
+
+  <rect x="930" y="500" width="190" height="130" rx="20" fill="white" stroke="#222" stroke-width="3"/>
+  <text x="960" y="545" font-family="Arial" font-size="23" font-weight="700">左扬声器</text>
+  <text x="960" y="580" font-family="Arial" font-size="19">8Ω / 2W</text>
+  <text x="960" y="610" font-family="Arial" font-size="16">L+ / L−</text>
+
+  <rect x="1160" y="500" width="190" height="130" rx="20" fill="white" stroke="#222" stroke-width="3"/>
+  <text x="1190" y="545" font-family="Arial" font-size="23" font-weight="700">右扬声器</text>
+  <text x="1190" y="580" font-family="Arial" font-size="19">8Ω / 2W</text>
+  <text x="1190" y="610" font-family="Arial" font-size="16">R+ / R−</text>
+
+  <rect x="90" y="540" width="320" height="210" rx="24" fill="white" stroke="#222" stroke-width="3"/>
+  <text x="120" y="585" font-family="Arial" font-size="24" font-weight="700">3.7V 锂电池</text>
+  <text x="120" y="625" font-family="Arial" font-size="19">2000～2500mAh（原型）</text>
+  <text x="120" y="660" font-family="Arial" font-size="19">保护 / 充电 / 电源管理</text>
+  <text x="120" y="695" font-family="Arial" font-size="19">→ 5V / 3.3V 电源轨</text>
+  <text x="120" y="725" font-family="Arial" font-size="15">不能直接把裸电池接功放</text>
+
+  <rect x="500" y="540" width="300" height="210" rx="24" fill="white" stroke="#222" stroke-width="3"/>
+  <text x="530" y="585" font-family="Arial" font-size="24" font-weight="700">GT-U7 GPS</text>
+  <text x="530" y="625" font-family="Arial" font-size="19">UART / NMEA</text>
+  <text x="530" y="660" font-family="Arial" font-size="19">尽量远离功放和电源模块</text>
+  <text x="530" y="700" font-family="Arial" font-size="17">天线朝非金属外壳方向</text>
+
+  <line x1="380" y1="285" x2="500" y2="285" stroke="#111" stroke-width="5"/>
+  <polygon points="490,275 510,285 490,295" fill="#111"/>
+  <text x="400" y="260" font-family="Arial" font-size="17">A2DP</text>
+
+  <line x1="880" y1="285" x2="1000" y2="285" stroke="#111" stroke-width="5"/>
+  <polygon points="990,275 1010,285 990,295" fill="#111"/>
+  <text x="895" y="260" font-family="Arial" font-size="17">PCM / I2S / USB Audio</text>
+
+  <line x1="1120" y1="360" x2="1030" y2="500" stroke="#111" stroke-width="5"/>
+  <polygon points="1030,500 1034,480 1048,491" fill="#111"/>
+  <text x="1070" y="430" font-family="Arial" font-size="17">L+ / L−</text>
+
+  <line x1="1200" y1="360" x2="1250" y2="500" stroke="#111" stroke-width="5"/>
+  <polygon points="1245,490 1250,510 1260,492" fill="#111"/>
+  <text x="1230" y="430" font-family="Arial" font-size="17">R+ / R−</text>
+
+  <line x1="410" y1="640" x2="500" y2="640" stroke="#111" stroke-width="5"/>
+  <polygon points="490,630 510,640 490,650" fill="#111"/>
+  <text x="420" y="615" font-family="Arial" font-size="17">3.3V / 5V</text>
+
+  <line x1="800" y1="640" x2="930" y2="570" stroke="#111" stroke-width="4" stroke-dasharray="10 8"/>
+  <text x="805" y="610" font-family="Arial" font-size="16">UART / GPS 数据</text>
+
+  <line x1="800" y1="690" x2="1000" y2="360" stroke="#111" stroke-width="4" stroke-dasharray="10 8"/>
+  <text x="820" y="760" font-family="Arial" font-size="16">5V 功放电源轨</text>
+
+  <text x="80" y="835" font-family="Arial" font-size="18">注：这是 V1.1 原理/连接图，不是 PCB 生产 Gerber。最终功放、电源管理、音频 Codec 与 Orange Pi 具体型号确定后再冻结引脚。</text>
+</svg>
